@@ -1,6 +1,6 @@
 # cliskills
 
-Open-source Codex skills for LaTeX work. This repository packages three repository-scoped skills under `.agents/skills/` so they can be versioned, reviewed, and shared like normal source code.
+Open-source Codex skills for LaTeX work. This repository packages repository-scoped skills under `.agents/skills/` so they can be versioned, reviewed, and shared like normal source code.
 
 For Chinese documentation, see [README-zh.md](./README-zh.md).
 
@@ -9,8 +9,13 @@ For Chinese documentation, see [README-zh.md](./README-zh.md).
 | Skill | Purpose |
 | --- | --- |
 | `latex-beamer` | Build, rewrite, and tighten Beamer slide decks for talks, defenses, and course presentations |
+| `latex-beamer-translate` | Translate Beamer decks while keeping slide density and presentation rhythm under control |
 | `latex-tikz` | Create and refine TikZ or PGFPlots figures, with `tikz.net` as the first reference point |
 | `latex-bug` | Diagnose LaTeX compilation failures and review `.cls` / `.sty` behavior |
+| `latex-tex-translate` | Translate `.tex` source while preserving commands, citations, labels, and math |
+| `latex-pdf-translate` | Translate academic PDFs while being explicit about extraction fidelity |
+| `latex-academic-polish` | Polish LaTeX-based academic prose without changing technical meaning |
+| `latex-bilingual` | Generate bilingual LaTeX output such as Chinese-English or English-French versions |
 
 Each skill includes:
 - `SKILL.md` with trigger conditions and workflow
@@ -21,9 +26,14 @@ Each skill includes:
 
 ```text
 .agents/skills/
+  latex-academic-polish/
   latex-beamer/
-  latex-tikz/
+  latex-beamer-translate/
+  latex-bilingual/
   latex-bug/
+  latex-pdf-translate/
+  latex-tex-translate/
+  latex-tikz/
 AGENTS.md
 Makefile
 README.md
@@ -45,6 +55,7 @@ The current skills are intentionally bilingual in triggering behavior:
 make info
 make list
 make validate
+make validate-quick
 make install
 ```
 
@@ -62,6 +73,8 @@ make release
 
 - `make doctor`: verify local tools needed for packaging and validation
 - `make validate`: check that required docs exist and each skill has valid core metadata
+- `make validate-quick`: run Codex `quick_validate.py` across all skills
+- `make validate-all`: run both validation layers together
 - `make install`: install all skills locally
 - `make install-skill SKILL=<id>`: install a single skill
 - `make manifest`: generate `dist/MANIFEST.txt` for release contents
@@ -71,7 +84,7 @@ make release
 ## Development workflow
 
 1. Edit a skill under `.agents/skills/<skill-id>/`.
-2. Run `make validate`.
+2. Run `make validate-all`.
 3. If you want a local dry-run install, use `make install` or `make install-skill SKILL=<id>`.
 4. Build a shareable archive with `make package`.
 

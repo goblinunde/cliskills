@@ -1,0 +1,4 @@
+interface:
+  display_name: "LaTeX TeX Translate"
+  short_description: "中文/English translation for LaTeX source files."
+  default_prompt: "使用 $latex-tex-translate 帮我翻译这个 .tex 文档，并保持命令、公式和引用结构不变。"

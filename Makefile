@@ -1,8 +1,10 @@
 SHELL := /bin/sh
+PYTHON ?= python
 
 SKILL_DIR ?= .agents/skills
 SKILLS := $(sort $(notdir $(wildcard $(SKILL_DIR)/*)))
 SKILL_COUNT := $(words $(SKILLS))
+QUICK_VALIDATE ?= /home/yyt/.codex/skills/.system/skill-creator/scripts/quick_validate.py
 
 INSTALL_BASE ?= $(if $(CODEX_HOME),$(CODEX_HOME),$(HOME)/.codex)
 INSTALL_DIR ?= $(INSTALL_BASE)/skills
@@ -17,7 +19,7 @@ RELEASE_FILES := .agents $(DOC_FILES)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help info list doctor validate install install-skill deploy manifest package release clean
+.PHONY: help info list doctor validate validate-quick validate-all install install-skill deploy manifest package release clean
 
 help:
 	@printf '%s\n' \
@@ -26,6 +28,8 @@ help:
 		'  make list                         - list bundled skill ids' \
 		'  make doctor                       - verify required local tools exist' \
 		'  make validate                     - validate skill metadata and required docs' \
+		'  make validate-quick               - run Codex quick_validate.py on every skill' \
+		'  make validate-all                 - run both repository and quick validation' \
 		'  make install                      - copy all skills to $${CODEX_HOME:-$$HOME/.codex}/skills' \
 		'  make install-skill SKILL=<id>     - install one skill by id' \
 		'  make deploy                       - alias for make install' \
@@ -39,6 +43,7 @@ info:
 	@printf 'Skill source dir: %s\n' "$(SKILL_DIR)"
 	@printf 'Install dir: %s\n' "$(INSTALL_DIR)"
 	@printf 'Dist file: %s\n' "$(DIST_FILE)"
+	@printf 'Quick validator: %s\n' "$(QUICK_VALIDATE)"
 	@printf 'Skills discovered (%s): %s\n' "$(SKILL_COUNT)" "$(SKILLS)"
 
 list:
@@ -49,9 +54,14 @@ list:
 	done
 
 doctor:
-	@for tool in cp grep tar find sort; do \
+	@for tool in $(PYTHON) cp grep tar find sort; do \
 		command -v "$$tool" >/dev/null 2>&1 || { echo "Missing required tool: $$tool"; exit 1; }; \
 	done
+	@if [ -f "$(QUICK_VALIDATE)" ]; then \
+		echo "Codex quick validator found."; \
+	else \
+		echo "Codex quick validator not found at $(QUICK_VALIDATE)."; \
+	fi
 	@echo "Local tool check passed."
 
 validate:
@@ -74,6 +84,18 @@ validate:
 		grep -q 'default_prompt:' "$$dir/agents/openai.yaml" || { echo "Missing default_prompt in $$dir/agents/openai.yaml"; exit 1; }; \
 	done; \
 	echo "Validated $$count skill(s) and repository docs."
+
+validate-quick:
+	@test -d "$(SKILL_DIR)" || { echo "Missing $(SKILL_DIR)"; exit 1; }
+	@test -n "$(SKILLS)" || { echo "No skills found under $(SKILL_DIR)"; exit 1; }
+	@test -f "$(QUICK_VALIDATE)" || { echo "Missing quick validator: $(QUICK_VALIDATE)"; exit 1; }
+	@for skill in $(SKILLS); do \
+		$(PYTHON) "$(QUICK_VALIDATE)" "$(SKILL_DIR)/$$skill" || exit 1; \
+	done
+	@echo "Codex quick_validate passed for $(SKILL_COUNT) skill(s)."
+
+validate-all: validate validate-quick
+	@echo "All validation layers passed."
 
 install: validate
 	@mkdir -p "$(INSTALL_DIR)"
@@ -110,7 +132,7 @@ package: manifest
 	@tar -czf "$(DIST_FILE)" $(RELEASE_FILES) "$(MANIFEST_FILE)"
 	@echo "Created $(DIST_FILE)"
 
-release: doctor manifest package
+release: doctor validate-all manifest package
 	@echo "Release artifacts are ready under $(DIST_DIR)"
 
 clean:

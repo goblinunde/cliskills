@@ -1,0 +1,4 @@
+interface:
+  display_name: "LaTeX Bilingual"
+  short_description: "中文/English bilingual output for LaTeX documents."
+  default_prompt: "使用 $latex-bilingual 帮我把这个 LaTeX 文档做成双语版本。"

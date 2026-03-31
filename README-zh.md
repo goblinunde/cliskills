@@ -1,6 +1,6 @@
 # cliskills
 
-这是一个面向 LaTeX 工作流的开源 Codex skills 仓库。仓库把 3 个技能放在 `.agents/skills/` 下，便于像普通源码一样进行版本管理、审查和分享。
+这是一个面向 LaTeX 工作流的开源 Codex skills 仓库。仓库把多个技能放在 `.agents/skills/` 下，便于像普通源码一样进行版本管理、审查和分享。
 
 英文说明见 [README.md](./README.md)。
 
@@ -9,8 +9,13 @@
 | 技能 | 用途 |
 | --- | --- |
 | `latex-beamer` | 用于制作、改写、压缩和优化 Beamer 幻灯片，适合答辩、汇报和课程展示 |
+| `latex-beamer-translate` | 用于翻译 Beamer 幻灯片，并控制页内文字密度和展示节奏 |
 | `latex-tikz` | 用于创建和优化 TikZ / PGFPlots 图形，并优先参考 `tikz.net` |
 | `latex-bug` | 用于排查 LaTeX 编译错误，以及审查 `.cls` / `.sty` 文件行为 |
+| `latex-tex-translate` | 用于翻译 `.tex` 源文件，并保留命令、引用、标签和公式结构 |
+| `latex-pdf-translate` | 用于翻译学术 PDF，并明确说明提取质量和版式保真边界 |
+| `latex-academic-polish` | 用于润色 LaTeX 学术写作，不改变技术含义 |
+| `latex-bilingual` | 用于生成中英、英法等双语 LaTeX 输出 |
 
 每个技能目录都包含：
 - `SKILL.md`：定义触发边界、工作流和输出要求
@@ -21,9 +26,14 @@
 
 ```text
 .agents/skills/
+  latex-academic-polish/
   latex-beamer/
-  latex-tikz/
+  latex-beamer-translate/
+  latex-bilingual/
   latex-bug/
+  latex-pdf-translate/
+  latex-tex-translate/
+  latex-tikz/
 AGENTS.md
 Makefile
 README.md
@@ -45,6 +55,7 @@ README-zh.md
 make info
 make list
 make validate
+make validate-quick
 make install
 ```
 
@@ -62,6 +73,8 @@ make release
 
 - `make doctor`：检查本地是否具备打包和校验所需命令
 - `make validate`：检查文档文件和技能元数据是否齐全
+- `make validate-quick`：对所有 skill 运行 Codex 的 `quick_validate.py`
+- `make validate-all`：同时执行仓库级校验和 Codex 校验
 - `make install`：安装全部技能到本地 Codex 技能目录
 - `make install-skill SKILL=<id>`：只安装一个技能
 - `make manifest`：生成 `dist/MANIFEST.txt`，用于发布时查看归档内容
@@ -71,7 +84,7 @@ make release
 ## 开发流程
 
 1. 修改 `.agents/skills/<skill-id>/` 下的技能文件。
-2. 运行 `make validate`。
+2. 运行 `make validate-all`。
 3. 如需本地试装，运行 `make install` 或 `make install-skill SKILL=<id>`。
 4. 如需打包分享，运行 `make package`。
 

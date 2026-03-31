@@ -1,0 +1,4 @@
+interface:
+  display_name: "LaTeX PDF Translate"
+  short_description: "中文/English translation for academic PDF content."
+  default_prompt: "使用 $latex-pdf-translate 帮我把这个 PDF 翻译成目标语言，并尽量保留公式和结构。"
