@@ -1,6 +1,6 @@
 ---
 name: latex-bug
-description: Use when the user asks to diagnose or fix LaTeX compile failures, package conflicts, engine mismatches, missing fonts, broken references, bibliography issues, or class/style-file problems, including `.cls`, `.sty`, `.bst`, and build scripts ("编译错误", "Undefined control sequence", ".cls 审查", "latexmk", "xelatex"). Do not use for pure content writing, slide polish, or TikZ design unless the primary task is debugging.
+description: Use when the user asks to diagnose or fix LaTeX compile failures, package conflicts, engine mismatches, missing fonts, broken references, bibliography issues, or class/style-file problems, including `.cls`, `.sty`, `.bst`, and build scripts. Strong Chinese triggers include "编译错误", "报错排查", "无法编译", "Undefined control sequence", ".cls 审查", ".sty 问题", "latexmk", "xelatex", and "帮我看日志". Do not use for pure content writing, slide polish, or TikZ design unless the primary task is debugging.
 ---
 
 # LaTeX Bug
@@ -8,6 +8,19 @@ description: Use when the user asks to diagnose or fix LaTeX compile failures, p
 Use this skill when the main task is finding the real cause of a LaTeX failure and proposing the smallest safe fix. This includes `.tex` sources, `.cls` and `.sty` review, and build-chain diagnosis.
 
 Read `references/latex-debug-checklist.md` for systematic triage, especially when multiple cascading errors appear.
+
+## Language Handling
+
+- Match the user's language. If the report is in Chinese, explain the root cause and fix path in Chinese.
+- Preserve exact error messages, command names, compiler engines, and file extensions verbatim.
+- When the user provides only screenshots or pasted logs, restate the first real error line clearly before proposing fixes.
+
+## Example Triggers
+
+- "这个 LaTeX 项目编译不过，帮我看日志。"
+- "为什么我用 xelatex 会报 fontspec 错误？"
+- "帮我审查一下这个 .cls 文件有没有坑。"
+- "Find the real cause of this LaTeX build failure."
 
 ## Workflow
 

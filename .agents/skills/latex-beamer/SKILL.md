@@ -1,6 +1,6 @@
 ---
 name: latex-beamer
-description: Use when the user asks to create, revise, tighten, theme, or optimize a LaTeX Beamer deck, including requests about slides (`.tex`), frames, overlays, handouts, talk flow, or defense presentations ("beamer", "幻灯片", "答辩PPT"). Do not use for TikZ-focused figure work or general LaTeX compiler debugging unless the Beamer deck itself is the main target.
+description: Use when the user asks to create, revise, tighten, theme, or optimize a LaTeX Beamer deck, including requests about slides (`.tex`), frames, overlays, handouts, talk flow, or defense presentations. Strong Chinese triggers include "beamer", "LaTeX 幻灯片", "答辩 PPT", "学术汇报", "报告 slides", "帮我改 Beamer", and "优化演示文稿". Do not use for TikZ-focused figure work or general LaTeX compiler debugging unless the Beamer deck itself is the main target.
 ---
 
 # LaTeX Beamer
@@ -8,6 +8,19 @@ description: Use when the user asks to create, revise, tighten, theme, or optimi
 Use this skill for Beamer-first work: building a new talk, restructuring an existing deck, or improving readability, pacing, and visual consistency.
 
 Read `references/beamer-playbook.md` when the request involves a full deck, theme cleanup, or major slide-density problems.
+
+## Language Handling
+
+- Match the user's language. If the user writes in Chinese, explain structure, tradeoffs, and edits in Chinese.
+- Keep LaTeX commands, package names, environment names, and compile instructions in their original technical form.
+- When the user mixes Chinese with English slide titles or notation, preserve the author's notation unless they ask for localization.
+
+## Example Triggers
+
+- "帮我做一个 Beamer 答辩 PPT。"
+- "把这个 beamer 幻灯片压缩到 12 页。"
+- "优化我的学术汇报 slides，让节奏更适合口头报告。"
+- "Rewrite this Beamer deck to be less text-heavy."
 
 ## Workflow
 
