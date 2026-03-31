@@ -1,0 +1,4 @@
+interface:
+  display_name: "LaTeX Bug"
+  short_description: "Diagnose LaTeX compile failures and review class files."
+  default_prompt: "Use $latex-bug to debug a LaTeX compilation error or review a .cls file."

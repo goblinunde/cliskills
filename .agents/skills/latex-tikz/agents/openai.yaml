@@ -1,0 +1,4 @@
+interface:
+  display_name: "LaTeX TikZ"
+  short_description: "Build and refine TikZ figures with tikz.net references."
+  default_prompt: "Use $latex-tikz to create or optimize a TikZ figure based on tikz.net examples."
