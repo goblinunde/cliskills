@@ -1,6 +1,6 @@
 # cliskills
 
-这是一个面向 LaTeX 工作流的开源 Codex skills 仓库。仓库把多个技能放在 `.agents/skills/` 下，便于像普通源码一样进行版本管理、审查和分享。
+这是一个面向 LaTeX 工作流的开源 skills 仓库，同时支持 Codex 和 Claude Code。当前仓库把同一套技能分别放在 `.agents/skills/` 和 `.claude/skills/` 下，便于像普通源码一样进行版本管理、审查和分享。
 
 英文说明见 [README.md](./README.md)。
 
@@ -19,7 +19,7 @@
 
 每个技能目录都包含：
 - `SKILL.md`：定义触发边界、工作流和输出要求
-- `agents/openai.yaml`：定义 UI 元数据和默认 prompt
+- `agents/openai.yaml`：Codex 版本的 UI 元数据和默认 prompt
 - `references/`：放置更详细的参考说明
 
 ## 仓库结构
@@ -34,15 +34,34 @@
   latex-pdf-translate/
   latex-tex-translate/
   latex-tikz/
+.claude/skills/
+  latex-academic-polish/
+  latex-beamer/
+  latex-beamer-translate/
+  latex-bilingual/
+  latex-bug/
+  latex-pdf-translate/
+  latex-tex-translate/
+  latex-tikz/
 AGENTS.md
 Makefile
 README.md
 README-zh.md
 ```
 
-## Codex 如何使用这些技能
+## Codex 和 Claude 如何使用这些技能
 
-当 Codex 在这个仓库中工作时，会从 `.agents/skills/` 扫描仓库级技能。与此同时，这些技能也可以通过复制到 `${CODEX_HOME:-$HOME/.codex}/skills` 的方式，在本机其他仓库中复用。
+当 Codex 在这个仓库中工作时，会从 `.agents/skills/` 扫描仓库级技能。Claude Code 则使用官方文档规定的项目级路径 `.claude/skills/<skill-name>/SKILL.md`。
+
+这个仓库现在保持两套目录同步：
+- `.agents/skills/` 是 Codex 用的主目录，包含 `agents/openai.yaml`
+- `.claude/skills/` 是 Claude Code 可直接识别的镜像目录
+- `references/` 一并迁移，所以 Claude 侧也保留了参考资料
+
+维护规则：
+- 技能内容统一在 `.agents/skills/` 下修改
+- 修改后运行 `make sync-claude` 刷新 `.claude/skills/`
+- 发布或推送前运行 `make validate-all`
 
 当前这些技能已经做了中英双语触发优化：
 - 保留英文触发能力
@@ -56,7 +75,9 @@ README-zh.md
 1. 直接在这个仓库里和 Codex 对话。因为技能就在 `.agents/skills/` 下，Codex 在仓库内工作时可以发现它们。
 2. 先运行 `make install`，把技能复制到 `${CODEX_HOME:-$HOME/.codex}/skills`，然后在其他仓库或本地会话中复用。
 
-你可以显式指定 skill：
+对于 Claude Code，这个仓库里的 `.claude/skills/` 已经是项目级目录，所以只要在仓库内工作即可被发现。
+
+你可以显式指定 Codex skill：
 
 ```text
 使用 $latex-tex-translate 帮我把这篇 LaTeX 论文翻译成英文，并保持引用、标签和公式不变。
@@ -64,6 +85,14 @@ README-zh.md
 使用 $latex-bug 帮我找到这个 LaTeX 编译错误的根因，并顺便审查 .cls 文件。
 
 使用 $latex-tikz 参考 tikz.net 的相似例子重画这个图。
+```
+
+在 Claude Code 里，直接调用用的是 `/skill-name`：
+
+```text
+/latex-tex-translate main.tex
+/latex-bug build.log
+/latex-tikz figure-concept.md
 ```
 
 也可以直接用自然语言描述任务，让 Codex 隐式命中：
@@ -92,6 +121,7 @@ README-zh.md
 ```sh
 make info
 make list
+make sync-claude
 make validate
 make validate-quick
 make install
@@ -105,14 +135,16 @@ make package
 make release
 ```
 
-`make install` 会把所有技能复制到 `${CODEX_HOME:-$HOME/.codex}/skills`。
+`make install` 会把所有 Codex 技能复制到 `${CODEX_HOME:-$HOME/.codex}/skills`。
 
 ## Makefile 命令
 
 - `make doctor`：检查本地是否具备打包和校验所需命令
+- `make list-claude`：列出 Claude 镜像目录中的 skill id
+- `make sync-claude`：根据 Codex 主目录刷新 `.claude/skills`
 - `make validate`：检查文档文件和技能元数据是否齐全
 - `make validate-quick`：对所有 skill 运行 Codex 的 `quick_validate.py`
-- `make validate-all`：同时执行仓库级校验和 Codex 校验
+- `make validate-all`：同时执行仓库级校验和 Codex quick 校验
 - `make install`：安装全部技能到本地 Codex 技能目录
 - `make install-skill SKILL=<id>`：只安装一个技能
 - `make manifest`：生成 `dist/MANIFEST.txt`，用于发布时查看归档内容
@@ -122,9 +154,10 @@ make release
 ## 开发流程
 
 1. 修改 `.agents/skills/<skill-id>/` 下的技能文件。
-2. 运行 `make validate-all`。
-3. 如需本地试装，运行 `make install` 或 `make install-skill SKILL=<id>`。
-4. 如需打包分享，运行 `make package`。
+2. 运行 `make sync-claude`。
+3. 运行 `make validate-all`。
+4. 如需本地试装，运行 `make install` 或 `make install-skill SKILL=<id>`。
+5. 如需打包分享，运行 `make package`。
 
 如果你想做隔离测试而不覆盖默认 Codex 技能目录，可以这样运行：
 
@@ -135,4 +168,5 @@ make install INSTALL_DIR=/tmp/codex-skills-test
 ## 参考链接
 
 - OpenAI Codex Skills 官方文档：<https://developers.openai.com/codex/skills>
+- Claude Code Skills 官方文档：<https://code.claude.com/docs/en/skills>
 - TikZ 示例站点：<https://tikz.net/>

@@ -1,6 +1,6 @@
 # cliskills
 
-Open-source Codex skills for LaTeX work. This repository packages repository-scoped skills under `.agents/skills/` so they can be versioned, reviewed, and shared like normal source code.
+Open-source LaTeX skills for both Codex and Claude Code. This repository now carries the same skill set in two project-scoped layouts: `.agents/skills/` for Codex and `.claude/skills/` for Claude Code.
 
 For Chinese documentation, see [README-zh.md](./README-zh.md).
 
@@ -19,7 +19,7 @@ For Chinese documentation, see [README-zh.md](./README-zh.md).
 
 Each skill includes:
 - `SKILL.md` with trigger conditions and workflow
-- `agents/openai.yaml` for UI-facing metadata
+- `agents/openai.yaml` for Codex UI-facing metadata
 - `references/` for longer task-specific guidance
 
 ## Repository layout
@@ -34,15 +34,34 @@ Each skill includes:
   latex-pdf-translate/
   latex-tex-translate/
   latex-tikz/
+.claude/skills/
+  latex-academic-polish/
+  latex-beamer/
+  latex-beamer-translate/
+  latex-bilingual/
+  latex-bug/
+  latex-pdf-translate/
+  latex-tex-translate/
+  latex-tikz/
 AGENTS.md
 Makefile
 README.md
 README-zh.md
 ```
 
-## How Codex uses this repo
+## How Codex and Claude use this repo
 
-Codex scans repository-scoped skills from `.agents/skills/` when working inside the repo. These skills are also structured so they can be copied into `${CODEX_HOME:-$HOME/.codex}/skills` for broader local reuse.
+Codex scans repository-scoped skills from `.agents/skills/` when working inside the repo. Claude Code uses the project-scoped `.claude/skills/<skill-name>/SKILL.md` layout documented in the official Claude docs.
+
+This repository keeps the two trees aligned:
+- `.agents/skills/` is the Codex source tree with `agents/openai.yaml`
+- `.claude/skills/` is the Claude-compatible mirror with `SKILL.md` and supporting files
+- `references/` are carried over so the Claude version keeps the same deeper guidance
+
+Maintenance rule:
+- edit skills under `.agents/skills/`
+- run `make sync-claude` to refresh the Claude mirror
+- run `make validate-all` before packaging or pushing changes
 
 The current skills are intentionally bilingual in triggering behavior:
 - English prompts remain first-class
@@ -56,7 +75,9 @@ There are two normal ways to use these skills:
 1. Work inside this repository and ask Codex naturally. Because the skills live under `.agents/skills/`, Codex can discover them while working here.
 2. Install them into `${CODEX_HOME:-$HOME/.codex}/skills` with `make install`, then use them from other repositories or local sessions.
 
-You can invoke a skill explicitly by naming it in the prompt:
+For Claude Code, the project-scoped copy already lives in `.claude/skills/`, so working inside this repository is enough for discovery.
+
+You can invoke a Codex skill explicitly by naming it in the prompt:
 
 ```text
 Use $latex-tex-translate to translate this LaTeX paper into English and keep citations, labels, and formulas unchanged.
@@ -64,6 +85,14 @@ Use $latex-tex-translate to translate this LaTeX paper into English and keep cit
 Use $latex-bug to find the real cause of this LaTeX compilation error and review the .cls file.
 
 Use $latex-tikz to rebuild this figure based on a similar example from tikz.net.
+```
+
+In Claude Code, direct invocation uses slash commands instead:
+
+```text
+/latex-tex-translate main.tex
+/latex-bug build.log
+/latex-tikz figure-concept.md
 ```
 
 You can also rely on implicit invocation by describing the task clearly:
@@ -92,6 +121,7 @@ Useful prompt patterns:
 ```sh
 make info
 make list
+make sync-claude
 make validate
 make validate-quick
 make install
@@ -105,14 +135,16 @@ make package
 make release
 ```
 
-`make install` copies all bundled skills into `${CODEX_HOME:-$HOME/.codex}/skills`.
+`make install` copies all bundled Codex skills into `${CODEX_HOME:-$HOME/.codex}/skills`.
 
 ## Makefile targets
 
 - `make doctor`: verify local tools needed for packaging and validation
+- `make list-claude`: list mirrored Claude skill ids
+- `make sync-claude`: refresh `.claude/skills` from the Codex source tree
 - `make validate`: check that required docs exist and each skill has valid core metadata
 - `make validate-quick`: run Codex `quick_validate.py` across all skills
-- `make validate-all`: run both validation layers together
+- `make validate-all`: run repository validation plus Codex quick validation
 - `make install`: install all skills locally
 - `make install-skill SKILL=<id>`: install a single skill
 - `make manifest`: generate `dist/MANIFEST.txt` for release contents
@@ -122,9 +154,10 @@ make release
 ## Development workflow
 
 1. Edit a skill under `.agents/skills/<skill-id>/`.
-2. Run `make validate-all`.
-3. If you want a local dry-run install, use `make install` or `make install-skill SKILL=<id>`.
-4. Build a shareable archive with `make package`.
+2. Run `make sync-claude`.
+3. Run `make validate-all`.
+4. If you want a local dry-run install, use `make install` or `make install-skill SKILL=<id>`.
+5. Build a shareable archive with `make package`.
 
 For isolated testing without touching your default Codex directory:
 
@@ -135,4 +168,5 @@ make install INSTALL_DIR=/tmp/codex-skills-test
 ## References
 
 - OpenAI Codex Skills documentation: <https://developers.openai.com/codex/skills>
+- Claude Code skills documentation: <https://code.claude.com/docs/en/skills>
 - TikZ example library: <https://tikz.net/>

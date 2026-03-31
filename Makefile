@@ -4,6 +4,9 @@ PYTHON ?= python
 SKILL_DIR ?= .agents/skills
 SKILLS := $(sort $(notdir $(wildcard $(SKILL_DIR)/*)))
 SKILL_COUNT := $(words $(SKILLS))
+CLAUDE_SKILL_DIR ?= .claude/skills
+CLAUDE_SKILLS := $(sort $(notdir $(wildcard $(CLAUDE_SKILL_DIR)/*)))
+CLAUDE_SKILL_COUNT := $(words $(CLAUDE_SKILLS))
 QUICK_VALIDATE ?= /home/yyt/.codex/skills/.system/skill-creator/scripts/quick_validate.py
 
 INSTALL_BASE ?= $(if $(CODEX_HOME),$(CODEX_HOME),$(HOME)/.codex)
@@ -15,17 +18,19 @@ DIST_FILE ?= $(DIST_DIR)/$(DIST_BASENAME).tgz
 MANIFEST_FILE ?= $(DIST_DIR)/MANIFEST.txt
 
 DOC_FILES := README.md README-zh.md AGENTS.md Makefile .gitignore
-RELEASE_FILES := .agents $(DOC_FILES)
+RELEASE_FILES := .agents .claude $(DOC_FILES)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help info list doctor validate validate-quick validate-all install install-skill deploy manifest package release clean
+.PHONY: help info list list-claude sync-claude doctor validate validate-quick validate-all install install-skill deploy manifest package release clean
 
 help:
 	@printf '%s\n' \
 		'Available targets:' \
 		'  make info                         - show repository paths and skill count' \
-		'  make list                         - list bundled skill ids' \
+		'  make list                         - list bundled skill ids from the Codex source tree' \
+		'  make list-claude                  - list mirrored Claude skill ids' \
+		'  make sync-claude                  - refresh .claude/skills from .agents/skills' \
 		'  make doctor                       - verify required local tools exist' \
 		'  make validate                     - validate skill metadata and required docs' \
 		'  make validate-quick               - run Codex quick_validate.py on every skill' \
@@ -40,17 +45,50 @@ help:
 
 info:
 	@printf 'Repository root: %s\n' "$$(pwd)"
-	@printf 'Skill source dir: %s\n' "$(SKILL_DIR)"
+	@printf 'Codex skill dir: %s\n' "$(SKILL_DIR)"
+	@printf 'Claude skill dir: %s\n' "$(CLAUDE_SKILL_DIR)"
 	@printf 'Install dir: %s\n' "$(INSTALL_DIR)"
 	@printf 'Dist file: %s\n' "$(DIST_FILE)"
 	@printf 'Quick validator: %s\n' "$(QUICK_VALIDATE)"
-	@printf 'Skills discovered (%s): %s\n' "$(SKILL_COUNT)" "$(SKILLS)"
+	@printf 'Codex skills discovered (%s): %s\n' "$(SKILL_COUNT)" "$(SKILLS)"
+	@printf 'Claude skills discovered (%s): %s\n' "$(CLAUDE_SKILL_COUNT)" "$(CLAUDE_SKILLS)"
 
 list:
 	@test -d "$(SKILL_DIR)" || { echo "Missing $(SKILL_DIR)"; exit 1; }
 	@test -n "$(SKILLS)" || { echo "No skills found under $(SKILL_DIR)"; exit 1; }
 	@for skill in $(SKILLS); do \
 		printf '%s\n' "$$skill"; \
+	done
+
+list-claude:
+	@test -d "$(CLAUDE_SKILL_DIR)" || { echo "Missing $(CLAUDE_SKILL_DIR)"; exit 1; }
+	@test -n "$(CLAUDE_SKILLS)" || { echo "No skills found under $(CLAUDE_SKILL_DIR)"; exit 1; }
+	@for skill in $(CLAUDE_SKILLS); do \
+		printf '%s\n' "$$skill"; \
+	done
+
+sync-claude:
+	@test -d "$(SKILL_DIR)" || { echo "Missing $(SKILL_DIR)"; exit 1; }
+	@test -n "$(SKILLS)" || { echo "No skills found under $(SKILL_DIR)"; exit 1; }
+	@mkdir -p "$(CLAUDE_SKILL_DIR)"
+	@for skill in $(SKILLS); do \
+		src="$(SKILL_DIR)/$$skill"; \
+		dst="$(CLAUDE_SKILL_DIR)/$$skill"; \
+		mkdir -p "$$dst"; \
+		cp "$$src/SKILL.md" "$$dst/SKILL.md"; \
+		if [ -d "$$src/references" ]; then \
+			mkdir -p "$$dst/references"; \
+			cp -R "$$src/references/." "$$dst/references/"; \
+		fi; \
+		if [ -d "$$src/scripts" ]; then \
+			mkdir -p "$$dst/scripts"; \
+			cp -R "$$src/scripts/." "$$dst/scripts/"; \
+		fi; \
+		if [ -d "$$src/assets" ]; then \
+			mkdir -p "$$dst/assets"; \
+			cp -R "$$src/assets/." "$$dst/assets/"; \
+		fi; \
+		echo "Synced $$skill -> $$dst"; \
 	done
 
 doctor:
@@ -67,23 +105,35 @@ doctor:
 validate:
 	@test -d "$(SKILL_DIR)" || { echo "Missing $(SKILL_DIR)"; exit 1; }
 	@test -n "$(SKILLS)" || { echo "No skills found under $(SKILL_DIR)"; exit 1; }
+	@test -d "$(CLAUDE_SKILL_DIR)" || { echo "Missing $(CLAUDE_SKILL_DIR)"; exit 1; }
+	@if [ "$(SKILLS)" != "$(CLAUDE_SKILLS)" ]; then \
+		echo "Codex and Claude skill sets differ."; \
+		echo "Codex : $(SKILLS)"; \
+		echo "Claude: $(CLAUDE_SKILLS)"; \
+		echo "Run: make sync-claude"; \
+		exit 1; \
+	fi
 	@for doc in $(DOC_FILES); do \
 		[ -f "$$doc" ] || { echo "Missing required file: $$doc"; exit 1; }; \
 	done
 	@count=0; \
 	for skill in $(SKILLS); do \
 		dir="$(SKILL_DIR)/$$skill"; \
+		claude_dir="$(CLAUDE_SKILL_DIR)/$$skill"; \
 		count=$$((count + 1)); \
 		[ -f "$$dir/SKILL.md" ] || { echo "Missing $$dir/SKILL.md"; exit 1; }; \
 		[ -f "$$dir/agents/openai.yaml" ] || { echo "Missing $$dir/agents/openai.yaml"; exit 1; }; \
+		[ -f "$$claude_dir/SKILL.md" ] || { echo "Missing $$claude_dir/SKILL.md"; exit 1; }; \
 		grep -q '^---$$' "$$dir/SKILL.md" || { echo "Missing frontmatter in $$dir/SKILL.md"; exit 1; }; \
 		grep -q '^name:[[:space:]]' "$$dir/SKILL.md" || { echo "Missing name: in $$dir/SKILL.md"; exit 1; }; \
 		grep -q '^description:[[:space:]]' "$$dir/SKILL.md" || { echo "Missing description: in $$dir/SKILL.md"; exit 1; }; \
+		grep -q '^---$$' "$$claude_dir/SKILL.md" || { echo "Missing frontmatter in $$claude_dir/SKILL.md"; exit 1; }; \
+		grep -q '^description:[[:space:]]' "$$claude_dir/SKILL.md" || { echo "Missing description: in $$claude_dir/SKILL.md"; exit 1; }; \
 		grep -q 'display_name:' "$$dir/agents/openai.yaml" || { echo "Missing display_name in $$dir/agents/openai.yaml"; exit 1; }; \
 		grep -q 'short_description:' "$$dir/agents/openai.yaml" || { echo "Missing short_description in $$dir/agents/openai.yaml"; exit 1; }; \
 		grep -q 'default_prompt:' "$$dir/agents/openai.yaml" || { echo "Missing default_prompt in $$dir/agents/openai.yaml"; exit 1; }; \
 	done; \
-	echo "Validated $$count skill(s) and repository docs."
+	echo "Validated $$count Codex skill(s), mirrored Claude skills, and repository docs."
 
 validate-quick:
 	@test -d "$(SKILL_DIR)" || { echo "Missing $(SKILL_DIR)"; exit 1; }
@@ -120,9 +170,12 @@ manifest: validate
 	@{ \
 		echo "cliskills release manifest"; \
 		echo "Archive: $(DIST_FILE)"; \
-		echo "Skills: $(SKILLS)"; \
+		echo "Codex skills: $(SKILLS)"; \
+		echo "Claude skills: $(CLAUDE_SKILLS)"; \
 		echo ""; \
 		find .agents -type f | sort; \
+		echo ""; \
+		find .claude -type f | sort; \
 		echo ""; \
 		for doc in $(DOC_FILES); do echo "$$doc"; done; \
 	} > "$(MANIFEST_FILE)"
@@ -132,7 +185,7 @@ package: manifest
 	@tar -czf "$(DIST_FILE)" $(RELEASE_FILES) "$(MANIFEST_FILE)"
 	@echo "Created $(DIST_FILE)"
 
-release: doctor validate-all manifest package
+release: sync-claude doctor validate-all manifest package
 	@echo "Release artifacts are ready under $(DIST_DIR)"
 
 clean:
