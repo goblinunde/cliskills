@@ -49,6 +49,44 @@ The current skills are intentionally bilingual in triggering behavior:
 - Chinese trigger phrases are added to improve implicit invocation
 - `default_prompt` examples in `openai.yaml` are Chinese-friendly
 
+## How to use the skills
+
+There are two normal ways to use these skills:
+
+1. Work inside this repository and ask Codex naturally. Because the skills live under `.agents/skills/`, Codex can discover them while working here.
+2. Install them into `${CODEX_HOME:-$HOME/.codex}/skills` with `make install`, then use them from other repositories or local sessions.
+
+You can invoke a skill explicitly by naming it in the prompt:
+
+```text
+Use $latex-tex-translate to translate this LaTeX paper into English and keep citations, labels, and formulas unchanged.
+
+Use $latex-bug to find the real cause of this LaTeX compilation error and review the .cls file.
+
+Use $latex-tikz to rebuild this figure based on a similar example from tikz.net.
+```
+
+You can also rely on implicit invocation by describing the task clearly:
+
+```text
+把这个 tex 文件翻译成英文，但不要改动公式、引用和命令。
+
+帮我把这套 Beamer 幻灯片翻译成中文，并控制每页文字密度。
+
+Polish this abstract for academic English without changing the technical meaning.
+```
+
+As a rule:
+- use explicit `$skill-name` calls when you want deterministic routing
+- use natural prompts when the task is simple and clearly matches a skill
+- mention target language, file type, and output constraint in the prompt
+
+Useful prompt patterns:
+- translation: source format + target language + what must stay unchanged
+- polishing: scope + desired tone + what must not change
+- debugging: compiler/log/build command + first visible error
+- TikZ/Beamer: target output + density/style constraint + source files
+
 ## Quick start
 
 ```sh
