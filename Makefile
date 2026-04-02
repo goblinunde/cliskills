@@ -11,6 +11,8 @@ QUICK_VALIDATE ?= /home/yyt/.codex/skills/.system/skill-creator/scripts/quick_va
 
 INSTALL_BASE ?= $(if $(CODEX_HOME),$(CODEX_HOME),$(HOME)/.codex)
 INSTALL_DIR ?= $(INSTALL_BASE)/skills
+CLAUDE_INSTALL_BASE ?= $(if $(CLAUDE_HOME),$(CLAUDE_HOME),$(HOME)/.claude)
+CLAUDE_INSTALL_DIR ?= $(CLAUDE_INSTALL_BASE)/skills
 
 DIST_DIR ?= dist
 DIST_BASENAME ?= cliskills-skills
@@ -22,7 +24,7 @@ RELEASE_FILES := .agents .claude $(DOC_FILES)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help info list list-claude sync-claude doctor validate validate-quick validate-all install install-skill deploy manifest package release clean
+.PHONY: help info list list-claude sync-claude doctor validate validate-quick validate-all install install-skill install-claude deploy manifest package release clean
 
 help:
 	@printf '%s\n' \
@@ -30,23 +32,25 @@ help:
 		'  make info                         - show repository paths and skill count' \
 		'  make list                         - list bundled skill ids from the Codex source tree' \
 		'  make list-claude                  - list mirrored Claude skill ids' \
-		'  make sync-claude                  - refresh .claude/skills from .agents/skills' \
+		'  make sync-claude                  - refresh the project-scoped .claude/skills mirror' \
 		'  make doctor                       - verify required local tools exist' \
 		'  make validate                     - validate skill metadata and required docs' \
 		'  make validate-quick               - run Codex quick_validate.py on every skill' \
 		'  make validate-all                 - run both repository and quick validation' \
 		'  make install                      - copy all skills to $${CODEX_HOME:-$$HOME/.codex}/skills' \
 		'  make install-skill SKILL=<id>     - install one skill by id' \
+		'  make install-claude               - copy mirrored skills to $${CLAUDE_HOME:-$$HOME/.claude}/skills' \
 		'  make deploy                       - alias for make install' \
 		'  make manifest                     - write a release manifest to dist/' \
 		'  make package                      - create a release archive in dist/' \
-		'  make release                      - run doctor, validate, manifest, and package' \
+		'  make release                      - run sync-claude, doctor, validate-all, manifest, and package' \
 		'  make clean                        - remove generated dist artifacts'
 
 info:
 	@printf 'Repository root: %s\n' "$$(pwd)"
 	@printf 'Codex skill dir: %s\n' "$(SKILL_DIR)"
-	@printf 'Claude skill dir: %s\n' "$(CLAUDE_SKILL_DIR)"
+	@printf 'Claude project skill dir: %s\n' "$(CLAUDE_SKILL_DIR)"
+	@printf 'Claude install dir: %s\n' "$(CLAUDE_INSTALL_DIR)"
 	@printf 'Install dir: %s\n' "$(INSTALL_DIR)"
 	@printf 'Dist file: %s\n' "$(DIST_FILE)"
 	@printf 'Quick validator: %s\n' "$(QUICK_VALIDATE)"
@@ -89,6 +93,14 @@ sync-claude:
 			cp -R "$$src/assets/." "$$dst/assets/"; \
 		fi; \
 		echo "Synced $$skill -> $$dst"; \
+	done
+
+install-claude: validate
+	@mkdir -p "$(CLAUDE_INSTALL_DIR)"
+	@for skill in $(CLAUDE_SKILLS); do \
+		rm -rf "$(CLAUDE_INSTALL_DIR)/$$skill"; \
+		cp -R "$(CLAUDE_SKILL_DIR)/$$skill" "$(CLAUDE_INSTALL_DIR)/"; \
+		echo "Installed $$skill -> $(CLAUDE_INSTALL_DIR)/$$skill"; \
 	done
 
 doctor:
