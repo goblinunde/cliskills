@@ -1,0 +1,4 @@
+interface:
+  display_name: "Read arXiv Paper"
+  short_description: "Read arXiv papers from source bundles and write local summaries."
+  default_prompt: "使用 $read-arxiv-paper 帮我读取这个 arXiv 论文链接，并生成一份本地总结。"

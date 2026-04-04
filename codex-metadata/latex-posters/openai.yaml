@@ -1,0 +1,4 @@
+interface:
+  display_name: "LaTeX Posters"
+  short_description: "Create and refine research posters in LaTeX."
+  default_prompt: "使用 $latex-posters 帮我制作或优化一个 LaTeX 学术海报。"

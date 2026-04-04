@@ -1,0 +1,4 @@
+interface:
+  display_name: "Formatter"
+  short_description: "Check and correct thesis-style LaTeX formatting issues."
+  default_prompt: "使用 $formatter 帮我检查这个 LaTeX 文档的格式问题，并按论文规范修正。"

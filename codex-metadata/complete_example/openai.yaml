@@ -1,0 +1,4 @@
+interface:
+  display_name: "Complete Example"
+  short_description: "AI-enhanced LaTeX example generation with structure safeguards."
+  default_prompt: "使用 $complete-example 帮我为这个 LaTeX 项目补全示例内容，并保持结构与格式安全。"

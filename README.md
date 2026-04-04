@@ -6,7 +6,7 @@ For Chinese documentation, see [README-zh.md](./README-zh.md).
 
 ## At a glance
 
-- 8 bundled skills covering Beamer, TikZ, translation, debugging, academic polishing, and bilingual output
+- 15 bundled skills covering Beamer, TikZ, translation, debugging, polishing, formatting, posters, Typst conversion, Markdown-to-LaTeX, arXiv reading, and literature review
 - one authoring source: edit skills under `.agents/skills/`
 - one Claude mirror: refresh `.claude/skills/` with `make sync-claude`
 - local installation targets for both Codex and Claude Code
@@ -24,18 +24,26 @@ For Chinese documentation, see [README-zh.md](./README-zh.md).
 | `latex-pdf-translate` | Handling PDF-first translation workflows while being explicit about extraction fidelity |
 | `latex-academic-polish` | Polishing LaTeX-based academic prose without changing technical meaning |
 | `latex-bilingual` | Producing paired bilingual LaTeX output such as Chinese-English or English-French versions |
+| `latex-posters` | Building research posters in LaTeX with poster templates, layout guidance, and review helpers |
+| `latex-to-typst` | Converting LaTeX documents and equations into Typst and validating the result |
+| `docs-latex` | Turning Markdown documents into presentation-quality LaTeX reports and PDFs |
+| `formatter` | Checking thesis-style LaTeX formatting such as floats, equations, tables, and references |
+| `read-arxiv-paper` | Pulling arXiv source bundles, reading the paper from TeX, and writing a local summary |
+| `systematic-literature-review` | Running a multi-stage literature review pipeline with scoring, grouping, and export guidance |
+| `complete-example` | Filling LaTeX example sections with AI-generated content while protecting structure and formatting |
 
-Each skill directory is expected to contain:
+Each skill setup is expected to contain:
 
 - `SKILL.md` with trigger boundaries, workflow, and output rules
-- `agents/openai.yaml` with Codex-facing metadata
-- optional `references/`, `scripts/`, and `assets/` for deeper guidance or reusable helpers
+- optional `agents/openai.yaml` inside the skill, or a repository-level fallback at `codex-metadata/<skill-id>/openai.yaml`, for Codex-facing metadata and explicit prompt defaults
+- optional support files such as `references/`, `scripts/`, `assets/`, `README.md`, `config.yaml`, templates, or helper code when the skill needs them
 
 ## Repository model
 
 ```text
 .agents/skills/   # source of truth for Codex
 .claude/skills/   # synced mirror for Claude Code
+codex-metadata/   # writable overlay for Codex metadata when a skill tree is read-only
 Makefile          # sync, validate, install, package, release
 README.md
 README-zh.md
@@ -49,13 +57,14 @@ The maintenance rule is simple:
 - run `make validate-all` before packaging or pushing changes
 - use `make install` or `make install-claude` only for local consumer installs
 
-`make sync-claude` copies `SKILL.md` plus shared support directories such as `references/`, `scripts/`, and `assets/` when they exist.
+`make sync-claude` mirrors each skill into `.claude/skills/` by copying everything needed for Claude Code except the Codex-only `agents/` metadata directory.
 
 The current skills are intentionally bilingual in triggering behavior:
 
 - English prompts remain first-class
 - Chinese trigger phrases improve implicit invocation
 - `default_prompt` examples in `openai.yaml` are written to be Chinese-friendly
+- metadata can be stored either in-skill or under `codex-metadata/` when upstream skill folders are read-only
 
 ## Discovery and installation modes
 
@@ -120,6 +129,8 @@ Use explicit `$skill-name` calls when you want deterministic routing. Use natura
 ```sh
 make info
 make list
+make list-metadata
+make list-no-metadata
 make sync-claude
 make validate
 make validate-quick
@@ -138,13 +149,13 @@ make package
 make release
 ```
 
-`make install` copies all bundled Codex skills into `${CODEX_HOME:-$HOME/.codex}/skills`.
+`make install` copies all bundled Codex skills into `${CODEX_HOME:-$HOME/.codex}/skills` and materializes overlay metadata into installed skill directories when needed.
 `make install-claude` copies the mirrored Claude skills into `${CLAUDE_HOME:-$HOME/.claude}/skills`.
 
 ## Contributor workflow
 
 1. Edit a skill under `.agents/skills/<skill-id>/`.
-2. Keep `SKILL.md`, `agents/openai.yaml`, and any support files aligned.
+2. Keep `SKILL.md`, optional Codex metadata, and any support files aligned.
 3. Run `make sync-claude`.
 4. Run `make validate-all`.
 5. Optionally test installation with `make install`, `make install-skill SKILL=<id>`, or `make install-claude`.
@@ -155,19 +166,20 @@ When adding a new skill, the minimum expected structure is:
 ```text
 .agents/skills/<skill-id>/
   SKILL.md
-  agents/openai.yaml
 ```
 
-Add `references/`, `scripts/`, or `assets/` only when they materially improve the skill. After that, run `make sync-claude` so the Claude mirror stays in sync.
+Add `agents/openai.yaml` when the skill tree is writable, or `codex-metadata/<skill-id>/openai.yaml` when the source skill directory is read-only, if you want Codex-specific metadata and `make validate-quick` coverage. Add support files only when they materially improve the skill, for example `references/`, `scripts/`, `assets/`, templates, `README.md`, or `config.yaml`. After that, run `make sync-claude` so the Claude mirror stays in sync.
 
 ## Makefile targets
 
 - `make doctor`: verify local tools needed for packaging and validation
 - `make list`: list bundled Codex skill ids
+- `make list-metadata`: list skills that have Codex metadata, either in-skill or under `codex-metadata/`
+- `make list-no-metadata`: list skills that currently do not have Codex metadata
 - `make list-claude`: list mirrored Claude skill ids
 - `make sync-claude`: refresh the project-scoped `.claude/skills` mirror from the Codex source tree
 - `make validate`: check that required docs exist and each skill has valid core metadata
-- `make validate-quick`: run Codex `quick_validate.py` across all skills
+- `make validate-quick`: run Codex `quick_validate.py` across skills with in-skill or overlay Codex metadata
 - `make validate-all`: run repository validation plus Codex quick validation
 - `make install`: install all skills locally for Codex
 - `make install-skill SKILL=<id>`: install a single Codex skill
@@ -181,3 +193,6 @@ Add `references/`, `scripts/`, or `assets/` only when they materially improve th
 - OpenAI Codex Skills documentation: <https://developers.openai.com/codex/skills>
 - Claude Code skills documentation: <https://code.claude.com/docs/en/skills>
 - TikZ example library: <https://tikz.net/>
+- https://github.com/othmanadi/planning-with-files
+- https://github.com/obra/superpowers
+- https://github.com/snarktank/ralph

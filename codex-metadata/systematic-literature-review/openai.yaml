@@ -1,0 +1,4 @@
+interface:
+  display_name: "Systematic Literature Review"
+  short_description: "Run a scored literature review workflow with structured outputs."
+  default_prompt: "使用 $systematic-literature-review 帮我围绕这个主题执行系统综述流程，并输出结构化结果。"

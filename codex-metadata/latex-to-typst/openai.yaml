@@ -1,0 +1,4 @@
+interface:
+  display_name: "LaTeX to Typst"
+  short_description: "Convert LaTeX documents and equations into Typst."
+  default_prompt: "使用 $latex-to-typst 帮我把这个 LaTeX 文档转换成 Typst，并检查语法是否可用。"
