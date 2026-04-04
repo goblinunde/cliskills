@@ -1,0 +1,4 @@
+interface:
+  display_name: "LaTeX Bug"
+  short_description: "中文/English LaTeX debugging and class-file review."
+  default_prompt: "使用 $latex-bug 帮我排查 LaTeX 编译错误或审查一个 .cls 文件。"

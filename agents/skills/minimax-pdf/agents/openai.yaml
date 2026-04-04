@@ -1,0 +1,4 @@
+interface:
+  display_name: "MiniMax PDF"
+  short_description: "Generate, fill, and restyle polished PDFs with a design-driven workflow."
+  default_prompt: "使用 $minimax-pdf 帮我生成、填写或重排一个 PDF，并保持专业设计感。"

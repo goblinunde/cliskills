@@ -1,0 +1,4 @@
+interface:
+  display_name: "LaTeX Beamer"
+  short_description: "中文/English Beamer deck creation and refinement."
+  default_prompt: "使用 $latex-beamer 帮我制作或优化一个 LaTeX Beamer 演示文稿。"

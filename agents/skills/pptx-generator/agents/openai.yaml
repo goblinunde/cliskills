@@ -1,0 +1,4 @@
+interface:
+  display_name: "PPTX Generator"
+  short_description: "Create, edit, and analyze PowerPoint presentations and slide decks."
+  default_prompt: "使用 $pptx-generator 帮我生成、修改或分析一个 PPTX 演示文稿。"

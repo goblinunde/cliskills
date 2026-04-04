@@ -1,0 +1,4 @@
+interface:
+  display_name: "LaTeX TikZ"
+  short_description: "中文/English TikZ figure design with tikz.net references."
+  default_prompt: "使用 $latex-tikz 参考 tikz.net 帮我创建或优化一个 TikZ 图形。"

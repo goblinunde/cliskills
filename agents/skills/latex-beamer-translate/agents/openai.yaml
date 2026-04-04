@@ -1,0 +1,4 @@
+interface:
+  display_name: "LaTeX Beamer Translate"
+  short_description: "中文/English translation for Beamer slide decks."
+  default_prompt: "使用 $latex-beamer-translate 帮我翻译这套 Beamer 幻灯片，并控制每页文字密度。"

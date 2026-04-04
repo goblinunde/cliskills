@@ -1,0 +1,4 @@
+interface:
+  display_name: "LaTeX Academic Polish"
+  short_description: "中文/English academic polishing for LaTeX prose."
+  default_prompt: "使用 $latex-academic-polish 帮我润色这段 LaTeX 学术写作，但不要破坏结构。"

@@ -1,0 +1,4 @@
+interface:
+  display_name: "MiniMax DOCX"
+  short_description: "Create, edit, and format DOCX documents with OpenXML-based workflows."
+  default_prompt: "使用 $minimax-docx 帮我生成、修改或套版这个 Word 文档，并保持结构正确。"

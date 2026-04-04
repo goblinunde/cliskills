@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vision Analysis"
+  short_description: "Analyze images, screenshots, charts, and UI mockups with MiniMax vision."
+  default_prompt: "使用 $vision-analysis 帮我分析这张图片、截图或图表，并提取关键信息。"

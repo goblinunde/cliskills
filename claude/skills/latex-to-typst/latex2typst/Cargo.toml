@@ -1,0 +1,13 @@
+[package]
+name = "latex2typst"
+version = "0.1.0"
+edition = "2021"
+description = "Convert LaTeX to typst"
+
+[dependencies]
+regex = "1"
+clap = { version = "4", features = ["derive"] }
+
+[[bin]]
+name = "latex2typst"
+path = "src/main.rs"

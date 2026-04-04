@@ -1,0 +1,4 @@
+interface:
+  display_name: "MiniMax XLSX"
+  short_description: "Create, edit, validate, and analyze Excel workbooks with XML-safe workflows."
+  default_prompt: "使用 $minimax-xlsx 帮我创建、修改或校验这个 Excel 文件，并保证结构和公式安全。"
