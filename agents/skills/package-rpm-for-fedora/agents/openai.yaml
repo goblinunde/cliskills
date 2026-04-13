@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fedora RPM Packaging"
+  short_description: "Build or repackage Fedora-compatible RPMs from source, DEB packages, or binary archives."
+  default_prompt: "使用 $package-rpm-for-fedora 把这个上游源码、deb 或 tar.gz 处理成适合本机 Fedora/RHEL 系统的 rpm 包，并在需要时修改 spec。"

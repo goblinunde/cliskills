@@ -6,7 +6,7 @@
 
 ## 仓库速览
 
-- 共 20 个内置技能，覆盖 LaTeX、文档生成、Office 自动化和视觉分析
+- 共 22 个内置技能，覆盖 LaTeX、Git 与仓库工作流、Linux 打包、文档生成、Office 自动化和视觉分析
 - 唯一维护源：`agents/skills/`
 - Claude 镜像目录：`claude/skills/`
 - 每个 skill 自带 `agents/openai.yaml` 作为 Codex 元数据
@@ -62,6 +62,18 @@ AGENTS.md
 | `minimax-xlsx` | 安全创建、修改和校验 Excel 工作簿 |
 | `pptx-generator` | 生成、编辑和分析 PPTX 演示文稿 |
 
+### Linux 打包
+
+| 技能 | 最适合处理的任务 |
+| --- | --- |
+| `package-rpm-for-fedora` | 从源码、`.deb` 或二进制归档构建或重打包 Fedora 兼容 RPM |
+
+### Git 与仓库工作流
+
+| 技能 | 最适合处理的任务 |
+| --- | --- |
+| `github-commit` | 生成完整的 git 提交命令，默认 commit 精炼，按显式关键词切换中文、丰富说明和附加项 |
+
 ### 视觉分析
 
 | 技能 | 最适合处理的任务 |
@@ -85,7 +97,7 @@ AGENTS.md
 | 目标 | Codex | Claude Code |
 | --- | --- | --- |
 | 在本仓库内直接使用 | 直接读取 `agents/skills/` | 使用生成的 `claude/skills/` 镜像 |
-| 在其他仓库中复用 | `make install` 复制到 `${CODEX_HOME:-$HOME/.codex}/skills` | `make install-claude` 复制到 `${CLAUDE_HOME:-$HOME/.claude}/skills` |
+| 在其他仓库中复用 | `make install` 安装到 `${CODEX_HOME:-$HOME/.codex}/skills`，默认遇到本地冲突就失败 | `make install-claude` 安装到 `${CLAUDE_HOME:-$HOME/.claude}/skills`，默认遇到本地冲突就失败 |
 
 ### 典型维护流程
 
@@ -95,6 +107,17 @@ AGENTS.md
 4. 运行 `make validate` 或 `make validate-all`。
 5. 如需本地试装，再运行 `make install` 或 `make install-claude`。
 
+安装行为：
+
+- 默认 `INSTALL_MODE=fail`：只要已安装 skill 与源 skill 冲突就停止
+- `INSTALL_MODE=keep`：冲突时保留已安装版本
+- `INSTALL_MODE=overwrite`：冲突时覆盖已安装版本
+- 如果只是已安装 skill 下多了本地额外文件，而源文件本身完全一致，会保留这些额外文件
+
+### 技能特定环境说明
+
+- `package-rpm-for-fedora`：在依赖该技能做原生 RPM 构建前，先安装 Fedora/RHEL 打包工具链：`rpm-build`、`rpmdevtools`、`redhat-rpm-config`、`git`、`make`、`patch` 和一个 C 编译器。处理 `.deb` 或二进制归档重打包时，再补充 `dpkg-deb`，以及在本机可用时使用 `alien` 或 `fpm`。可用 `agents/skills/package-rpm-for-fedora/scripts/check_toolchain.sh source`、`agents/skills/package-rpm-for-fedora/scripts/check_toolchain.sh repack-deb` 或 `agents/skills/package-rpm-for-fedora/scripts/check_toolchain.sh repack-binary` 校验当前机器。
+
 ## 如何调用技能
 
 在 Codex 里可以显式调用：
@@ -103,6 +126,8 @@ AGENTS.md
 使用 $minimax-docx 帮我按现有模板排版这个 Word 文档。
 使用 $minimax-xlsx 帮我修复这个工作簿里的公式，并保持格式不丢失。
 使用 $latex-bug 帮我找到这个编译错误的真正根因。
+使用 $package-rpm-for-fedora 把这个上游 tar.gz 或 .deb 处理成适合当前 Fedora 主机的 rpm，并按需要修改 spec。
+使用 $github-commit 根据当前改动生成完整的 git add / commit / push 命令，默认 commit 精炼，只有我明确提到中文、丰富、README、.gitignore 或 workflow 时才扩展。
 ```
 
 也可以直接自然描述任务：
@@ -126,6 +151,7 @@ make list-metadata
 make list-no-metadata
 make sync-claude
 make validate
+make validate-skill SKILL=github-commit
 make validate-quick
 make validate-all
 make install
@@ -136,6 +162,8 @@ make install-claude
 
 ```sh
 make install-skill SKILL=minimax-pdf
+make install INSTALL_MODE=overwrite
+make install INSTALL_MODE=keep
 make install INSTALL_DIR=/tmp/codex-skills-test
 make install-claude CLAUDE_INSTALL_DIR=/tmp/claude-skills-test
 make package
@@ -151,11 +179,13 @@ make release
 - `make list-claude`：列出 Claude 镜像 skill id
 - `make sync-claude`：根据源树刷新 `claude/skills/`
 - `make validate`：校验文档、源 skill、镜像一致性和内联元数据
+- `make validate-skill SKILL=<id>`：校验单个源 skill、对应 Claude 镜像和内联元数据
 - `make validate-quick`：对带元数据的 skill 运行 Codex `quick_validate.py`
 - `make validate-all`：执行全部校验层
-- `make install`：安装全部 Codex skill
-- `make install-skill SKILL=<id>`：安装单个 Codex skill
-- `make install-claude`：安装全部 Claude 镜像 skill
+- `make install`：安装全部 Codex skill；默认冲突失败
+- `make install-skill SKILL=<id>`：安装单个 Codex skill；默认冲突失败
+- `make install-claude`：安装全部 Claude 镜像 skill；默认冲突失败
+- `INSTALL_MODE=fail|overwrite|keep`：控制安装冲突策略，默认是 `fail`
 - `make manifest`：生成 `dist/MANIFEST.txt`
 - `make package`：生成 `dist/cliskills-skills.tgz`
 - `make release`：执行同步、校验、清单生成和打包

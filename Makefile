@@ -2,18 +2,19 @@ SHELL := /bin/sh
 PYTHON ?= python
 
 SKILL_DIR ?= agents/skills
-SKILLS := $(sort $(notdir $(wildcard $(SKILL_DIR)/*)))
-SKILL_COUNT := $(words $(SKILLS))
-INLINE_METADATA_SKILLS := $(sort $(patsubst $(SKILL_DIR)/%/agents/openai.yaml,%,$(wildcard $(SKILL_DIR)/*/agents/openai.yaml)))
-CODEX_METADATA_SKILLS := $(INLINE_METADATA_SKILLS)
-CODEX_METADATA_SKILL_COUNT := $(words $(CODEX_METADATA_SKILLS))
+SKILLS = $(sort $(notdir $(wildcard $(SKILL_DIR)/*)))
+SKILL_COUNT = $(words $(SKILLS))
+INLINE_METADATA_SKILLS = $(sort $(patsubst $(SKILL_DIR)/%/agents/openai.yaml,%,$(wildcard $(SKILL_DIR)/*/agents/openai.yaml)))
+CODEX_METADATA_SKILLS = $(INLINE_METADATA_SKILLS)
+CODEX_METADATA_SKILL_COUNT = $(words $(CODEX_METADATA_SKILLS))
 CLAUDE_SKILL_DIR ?= claude/skills
-CLAUDE_SKILLS := $(sort $(notdir $(wildcard $(CLAUDE_SKILL_DIR)/*)))
-CLAUDE_SKILL_COUNT := $(words $(CLAUDE_SKILLS))
+CLAUDE_SKILLS = $(sort $(notdir $(wildcard $(CLAUDE_SKILL_DIR)/*)))
+CLAUDE_SKILL_COUNT = $(words $(CLAUDE_SKILLS))
 QUICK_VALIDATE ?= /home/yyt/.codex/skills/.system/skill-creator/scripts/quick_validate.py
 
 INSTALL_BASE ?= $(if $(CODEX_HOME),$(CODEX_HOME),$(HOME)/.codex)
 INSTALL_DIR ?= $(INSTALL_BASE)/skills
+INSTALL_MODE ?= fail
 CLAUDE_INSTALL_BASE ?= $(if $(CLAUDE_HOME),$(CLAUDE_HOME),$(HOME)/.claude)
 CLAUDE_INSTALL_DIR ?= $(CLAUDE_INSTALL_BASE)/skills
 
@@ -27,7 +28,7 @@ RELEASE_FILES := agents claude $(DOC_FILES)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help info list list-metadata list-no-metadata list-claude sync-claude doctor validate validate-quick validate-all install install-skill install-claude deploy manifest package release clean
+.PHONY: help info list list-metadata list-no-metadata list-claude sync-claude doctor validate validate-skill validate-quick validate-all install install-skill install-claude deploy manifest package release clean
 
 help:
 	@printf '%s\n' \
@@ -40,11 +41,12 @@ help:
 		'  make sync-claude                  - refresh the project-scoped claude/skills mirror' \
 		'  make doctor                       - verify required local tools exist' \
 		'  make validate                     - validate required docs, mirrored skills, and skill-local Codex metadata' \
+		'  make validate-skill SKILL=<id>    - validate one skill plus its Claude mirror and metadata' \
 		'  make validate-quick               - run Codex quick_validate.py on skills with agents/openai.yaml' \
 		'  make validate-all                 - run both repository and quick validation' \
-		'  make install                      - copy all skills to $${CODEX_HOME:-$$HOME/.codex}/skills' \
-		'  make install-skill SKILL=<id>     - install one skill by id' \
-		'  make install-claude               - copy mirrored skills to $${CLAUDE_HOME:-$$HOME/.claude}/skills' \
+		'  make install                      - install all skills safely (default INSTALL_MODE=fail)' \
+		'  make install-skill SKILL=<id>     - install one skill safely (default INSTALL_MODE=fail)' \
+		'  make install-claude               - install mirrored Claude skills safely (default INSTALL_MODE=fail)' \
 		'  make deploy                       - alias for make install' \
 		'  make manifest                     - write a release manifest to dist/' \
 		'  make package                      - create a release archive in dist/' \
@@ -57,6 +59,7 @@ info:
 	@printf 'Claude project skill dir: %s\n' "$(CLAUDE_SKILL_DIR)"
 	@printf 'Claude install dir: %s\n' "$(CLAUDE_INSTALL_DIR)"
 	@printf 'Install dir: %s\n' "$(INSTALL_DIR)"
+	@printf 'Install mode: %s\n' "$(INSTALL_MODE)"
 	@printf 'Dist file: %s\n' "$(DIST_FILE)"
 	@printf 'Quick validator: %s\n' "$(QUICK_VALIDATE)"
 	@printf 'Codex skills discovered (%s): %s\n' "$(SKILL_COUNT)" "$(SKILLS)"
@@ -115,14 +118,46 @@ sync-claude:
 
 install-claude: validate
 	@mkdir -p "$(CLAUDE_INSTALL_DIR)"
+	@case "$(INSTALL_MODE)" in fail|overwrite|keep) ;; *) echo "Unknown INSTALL_MODE: $(INSTALL_MODE)"; exit 1;; esac
 	@for skill in $(CLAUDE_SKILLS); do \
-		rm -rf "$(CLAUDE_INSTALL_DIR)/$$skill"; \
-		cp -R "$(CLAUDE_SKILL_DIR)/$$skill" "$(CLAUDE_INSTALL_DIR)/"; \
-		echo "Installed $$skill -> $(CLAUDE_INSTALL_DIR)/$$skill"; \
+		src="$(CLAUDE_SKILL_DIR)/$$skill"; \
+		dst="$(CLAUDE_INSTALL_DIR)/$$skill"; \
+		src_manifest=$$(mktemp); \
+		dst_manifest=$$(mktemp); \
+		extras_manifest=$$(mktemp); \
+		if [ ! -e "$$dst" ]; then \
+			cp -R "$$src" "$(CLAUDE_INSTALL_DIR)/"; \
+			echo "Installed $$skill -> $$dst"; \
+		else \
+			(cd "$$src" && find . -type f | sort > "$$src_manifest"); \
+			missing_or_changed=0; \
+			while IFS= read -r rel; do \
+				if [ ! -f "$$dst/$$rel" ] || ! cmp -s "$$src/$$rel" "$$dst/$$rel"; then \
+					missing_or_changed=1; \
+					break; \
+				fi; \
+			done < "$$src_manifest"; \
+			if [ "$$missing_or_changed" -eq 0 ]; then \
+				(cd "$$dst" && find . -type f | sort > "$$dst_manifest"); \
+				grep -Fxv -f "$$src_manifest" "$$dst_manifest" > "$$extras_manifest" || true; \
+				if [ -s "$$extras_manifest" ]; then \
+					echo "Unchanged $$skill -> $$dst (local extra files preserved)"; \
+				else \
+					echo "Unchanged $$skill -> $$dst"; \
+				fi; \
+			else \
+				case "$(INSTALL_MODE)" in \
+					fail) echo "Conflict for $$dst; re-run with INSTALL_MODE=overwrite or INSTALL_MODE=keep"; rm -f "$$src_manifest" "$$dst_manifest" "$$extras_manifest"; exit 1 ;; \
+					overwrite) rm -rf "$$dst"; cp -R "$$src" "$(CLAUDE_INSTALL_DIR)/"; echo "Overwritten $$skill -> $$dst" ;; \
+					keep) echo "Kept existing $$skill -> $$dst" ;; \
+				esac; \
+			fi; \
+		fi; \
+		rm -f "$$src_manifest" "$$dst_manifest" "$$extras_manifest"; \
 	done
 
 doctor:
-	@for tool in $(PYTHON) cp grep tar find sort mktemp; do \
+	@for tool in $(PYTHON) cmp cp diff grep tar find sort mktemp; do \
 		command -v "$$tool" >/dev/null 2>&1 || { echo "Missing required tool: $$tool"; exit 1; }; \
 	done
 	@if [ -f "$(QUICK_VALIDATE)" ]; then \
@@ -163,8 +198,67 @@ validate:
 		grep -q 'display_name:' "$$meta_file" || { echo "Missing display_name in $$meta_file"; exit 1; }; \
 		grep -q 'short_description:' "$$meta_file" || { echo "Missing short_description in $$meta_file"; exit 1; }; \
 		grep -q 'default_prompt:' "$$meta_file" || { echo "Missing default_prompt in $$meta_file"; exit 1; }; \
+		src_manifest=$$(mktemp); \
+		claude_manifest=$$(mktemp); \
+		(cd "$$dir" && find . -path './agents' -prune -o -type f -print | sort > "$$src_manifest"); \
+		(cd "$$claude_dir" && find . -type f -print | sort > "$$claude_manifest"); \
+		cmp -s "$$src_manifest" "$$claude_manifest" || { \
+			echo "Claude mirror file list differs for $$skill"; \
+			diff -u "$$src_manifest" "$$claude_manifest" || true; \
+			rm -f "$$src_manifest" "$$claude_manifest"; \
+			exit 1; \
+		}; \
+		while IFS= read -r rel; do \
+			cmp -s "$$dir/$$rel" "$$claude_dir/$$rel" || { \
+				echo "Claude mirror file content differs for $$skill: $$rel"; \
+				rm -f "$$src_manifest" "$$claude_manifest"; \
+				exit 1; \
+			}; \
+		done < "$$src_manifest"; \
+		rm -f "$$src_manifest" "$$claude_manifest"; \
 		done; \
 	echo "Validated $$count skill(s), mirrored Claude skills, repository docs, and skill-local Codex metadata."
+
+validate-skill:
+	@test -n "$(SKILL)" || { echo "Usage: make validate-skill SKILL=<skill-id>"; exit 1; }
+	@test -d "$(SKILL_DIR)/$(SKILL)" || { echo "Unknown skill: $(SKILL)"; exit 1; }
+	@test -d "$(CLAUDE_SKILL_DIR)" || { echo "Missing $(CLAUDE_SKILL_DIR)"; exit 1; }
+	@for doc in $(DOC_FILES); do \
+		[ -f "$$doc" ] || { echo "Missing required file: $$doc"; exit 1; }; \
+	done
+	@dir="$(SKILL_DIR)/$(SKILL)"; \
+	claude_dir="$(CLAUDE_SKILL_DIR)/$(SKILL)"; \
+	[ -f "$$dir/SKILL.md" ] || { echo "Missing $$dir/SKILL.md"; exit 1; }; \
+	[ -f "$$claude_dir/SKILL.md" ] || { echo "Missing $$claude_dir/SKILL.md"; exit 1; }; \
+	grep -q '^---$$' "$$dir/SKILL.md" || { echo "Missing frontmatter in $$dir/SKILL.md"; exit 1; }; \
+	grep -q '^name:[[:space:]]' "$$dir/SKILL.md" || { echo "Missing name: in $$dir/SKILL.md"; exit 1; }; \
+	grep -q '^description:[[:space:]]' "$$dir/SKILL.md" || { echo "Missing description: in $$dir/SKILL.md"; exit 1; }; \
+	grep -q '^---$$' "$$claude_dir/SKILL.md" || { echo "Missing frontmatter in $$claude_dir/SKILL.md"; exit 1; }; \
+	grep -q '^description:[[:space:]]' "$$claude_dir/SKILL.md" || { echo "Missing description: in $$claude_dir/SKILL.md"; exit 1; }; \
+	meta_file="$$dir/agents/openai.yaml"; \
+	[ -f "$$meta_file" ] || { echo "Missing $$meta_file"; exit 1; }; \
+	grep -q 'display_name:' "$$meta_file" || { echo "Missing display_name in $$meta_file"; exit 1; }; \
+	grep -q 'short_description:' "$$meta_file" || { echo "Missing short_description in $$meta_file"; exit 1; }; \
+	grep -q 'default_prompt:' "$$meta_file" || { echo "Missing default_prompt in $$meta_file"; exit 1; }; \
+	src_manifest=$$(mktemp); \
+	claude_manifest=$$(mktemp); \
+	(cd "$$dir" && find . -path './agents' -prune -o -type f -print | sort > "$$src_manifest"); \
+	(cd "$$claude_dir" && find . -type f -print | sort > "$$claude_manifest"); \
+	cmp -s "$$src_manifest" "$$claude_manifest" || { \
+		echo "Claude mirror file list differs for $(SKILL)"; \
+		diff -u "$$src_manifest" "$$claude_manifest" || true; \
+		rm -f "$$src_manifest" "$$claude_manifest"; \
+		exit 1; \
+	}; \
+	while IFS= read -r rel; do \
+		cmp -s "$$dir/$$rel" "$$claude_dir/$$rel" || { \
+			echo "Claude mirror file content differs for $(SKILL): $$rel"; \
+			rm -f "$$src_manifest" "$$claude_manifest"; \
+			exit 1; \
+		}; \
+	done < "$$src_manifest"; \
+	rm -f "$$src_manifest" "$$claude_manifest"; \
+	echo "Validated skill $(SKILL), its Claude mirror, repository docs, and skill-local Codex metadata."
 
 validate-quick:
 	@test -f "$(QUICK_VALIDATE)" || { echo "Missing quick validator: $(QUICK_VALIDATE)"; exit 1; }
@@ -182,19 +276,83 @@ validate-all: validate validate-quick
 
 install: validate
 	@mkdir -p "$(INSTALL_DIR)"
+	@case "$(INSTALL_MODE)" in fail|overwrite|keep) ;; *) echo "Unknown INSTALL_MODE: $(INSTALL_MODE)"; exit 1;; esac
 	@for skill in $(SKILLS); do \
-		rm -rf "$(INSTALL_DIR)/$$skill"; \
-		cp -R "$(SKILL_DIR)/$$skill" "$(INSTALL_DIR)/"; \
-		echo "Installed $$skill -> $(INSTALL_DIR)/$$skill"; \
+		src="$(SKILL_DIR)/$$skill"; \
+		dst="$(INSTALL_DIR)/$$skill"; \
+		src_manifest=$$(mktemp); \
+		dst_manifest=$$(mktemp); \
+		extras_manifest=$$(mktemp); \
+		if [ ! -e "$$dst" ]; then \
+			cp -R "$$src" "$(INSTALL_DIR)/"; \
+			echo "Installed $$skill -> $$dst"; \
+		else \
+			(cd "$$src" && find . -type f | sort > "$$src_manifest"); \
+			missing_or_changed=0; \
+			while IFS= read -r rel; do \
+				if [ ! -f "$$dst/$$rel" ] || ! cmp -s "$$src/$$rel" "$$dst/$$rel"; then \
+					missing_or_changed=1; \
+					break; \
+				fi; \
+			done < "$$src_manifest"; \
+			if [ "$$missing_or_changed" -eq 0 ]; then \
+				(cd "$$dst" && find . -type f | sort > "$$dst_manifest"); \
+				grep -Fxv -f "$$src_manifest" "$$dst_manifest" > "$$extras_manifest" || true; \
+				if [ -s "$$extras_manifest" ]; then \
+					echo "Unchanged $$skill -> $$dst (local extra files preserved)"; \
+				else \
+					echo "Unchanged $$skill -> $$dst"; \
+				fi; \
+			else \
+				case "$(INSTALL_MODE)" in \
+					fail) echo "Conflict for $$dst; re-run with INSTALL_MODE=overwrite or INSTALL_MODE=keep"; rm -f "$$src_manifest" "$$dst_manifest" "$$extras_manifest"; exit 1 ;; \
+					overwrite) rm -rf "$$dst"; cp -R "$$src" "$(INSTALL_DIR)/"; echo "Overwritten $$skill -> $$dst" ;; \
+					keep) echo "Kept existing $$skill -> $$dst" ;; \
+				esac; \
+			fi; \
+		fi; \
+		rm -f "$$src_manifest" "$$dst_manifest" "$$extras_manifest"; \
 	done
 
-install-skill: validate
+install-skill: validate-skill
 	@test -n "$(SKILL)" || { echo "Usage: make install-skill SKILL=<skill-id>"; exit 1; }
 	@test -d "$(SKILL_DIR)/$(SKILL)" || { echo "Unknown skill: $(SKILL)"; exit 1; }
 	@mkdir -p "$(INSTALL_DIR)"
-	@rm -rf "$(INSTALL_DIR)/$(SKILL)"
-	@cp -R "$(SKILL_DIR)/$(SKILL)" "$(INSTALL_DIR)/"
-	@echo "Installed $(SKILL) -> $(INSTALL_DIR)/$(SKILL)"
+	@case "$(INSTALL_MODE)" in fail|overwrite|keep) ;; *) echo "Unknown INSTALL_MODE: $(INSTALL_MODE)"; exit 1;; esac
+	@src="$(SKILL_DIR)/$(SKILL)"; \
+	dst="$(INSTALL_DIR)/$(SKILL)"; \
+	src_manifest=$$(mktemp); \
+	dst_manifest=$$(mktemp); \
+	extras_manifest=$$(mktemp); \
+	if [ ! -e "$$dst" ]; then \
+		cp -R "$$src" "$(INSTALL_DIR)/"; \
+		echo "Installed $(SKILL) -> $$dst"; \
+	else \
+		(cd "$$src" && find . -type f | sort > "$$src_manifest"); \
+		missing_or_changed=0; \
+		while IFS= read -r rel; do \
+			if [ ! -f "$$dst/$$rel" ] || ! cmp -s "$$src/$$rel" "$$dst/$$rel"; then \
+				missing_or_changed=1; \
+				break; \
+			fi; \
+		done < "$$src_manifest"; \
+		if [ "$$missing_or_changed" -eq 0 ]; then \
+			(cd "$$dst" && find . -type f | sort > "$$dst_manifest"); \
+			grep -Fxv -f "$$src_manifest" "$$dst_manifest" > "$$extras_manifest" || true; \
+			if [ -s "$$extras_manifest" ]; then \
+				echo "Unchanged $(SKILL) -> $$dst (local extra files preserved)"; \
+			else \
+				echo "Unchanged $(SKILL) -> $$dst"; \
+			fi; \
+		else \
+			case "$(INSTALL_MODE)" in \
+				fail) echo "Conflict for $$dst; re-run with INSTALL_MODE=overwrite or INSTALL_MODE=keep"; rm -f "$$src_manifest" "$$dst_manifest" "$$extras_manifest"; exit 1 ;; \
+				overwrite) rm -rf "$$dst"; cp -R "$$src" "$(INSTALL_DIR)/"; echo "Overwritten $(SKILL) -> $$dst" ;; \
+				keep) echo "Kept existing $(SKILL) -> $$dst" ;; \
+			esac; \
+		fi; \
+	fi; \
+	rm -f "$$src_manifest" "$$dst_manifest" "$$extras_manifest"
 
 deploy: install
 

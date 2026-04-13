@@ -1,0 +1,4 @@
+interface:
+  display_name: "GitHub Commit"
+  short_description: "Generate safe git commit and optional push commands with explicit mode switches."
+  default_prompt: "使用 $github-commit 根据当前改动生成完整的 git 提交命令；默认 commit 简洁，只有我明确提到中文、丰富、README、.gitignore、workflow 或 push 时才切换对应模式。"

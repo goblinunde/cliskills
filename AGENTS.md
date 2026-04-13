@@ -27,13 +27,20 @@ Useful commands:
 - `make list-claude` lists mirrored Claude skill directories
 - `make sync-claude` refreshes `claude/skills/` from `agents/skills/`
 - `make validate` checks required docs, metadata, and Codex/Claude mirror alignment
+- `make validate-skill SKILL=<id>` checks one skill plus its Claude mirror and metadata
 - `make validate-quick` runs Codex `quick_validate.py` across metadata-backed skills
 - `make validate-all` runs both validation layers
+- `make install INSTALL_MODE=fail|overwrite|keep` controls whether existing installed skills must match, be overwritten, or be kept
 - `rg --files` lists tracked files quickly
 - `git status` shows the current worktree state
 - `git diff -- README.md README-zh.md AGENTS.md Makefile` reviews project-doc changes before commit
+- `agents/skills/package-rpm-for-fedora/scripts/check_toolchain.sh source|repack-deb|repack-binary` verifies the local Fedora RPM packaging toolchain for the RPM skill
 
 If a skill introduces a toolchain or runtime dependency, document setup and verification in both this file and the README in the same change.
+
+For `package-rpm-for-fedora`, document and verify `rpm-build`, `rpmdevtools`, `redhat-rpm-config`, `git`, `make`, `patch`, and a compiler; for `.deb` repack flows, also note `dpkg-deb` and optional helpers such as `alien` or `fpm`.
+
+For install targets, keep the default non-destructive posture: fail on conflicting installed content unless the caller explicitly chooses `INSTALL_MODE=overwrite` or `INSTALL_MODE=keep`. When only local extra files exist under an installed skill and the source files still match, preserve those extras.
 
 ## Coding Style & Naming Conventions
 
@@ -57,6 +64,7 @@ When adding or changing skills, run:
 
 - `make sync-claude` if `agents/skills/` changed
 - `make validate`
+- `make validate-skill SKILL=<id>` when you only need to validate one affected skill before installing it locally
 - `make validate-quick` when a metadata-backed skill changes `SKILL.md` or `agents/openai.yaml`
 
 If a skill ships helper scripts or binaries, add a repeatable validation command to the skill docs.

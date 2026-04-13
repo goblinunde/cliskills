@@ -6,7 +6,7 @@ For Chinese documentation, see [README-zh.md](./README-zh.md).
 
 ## At a glance
 
-- 20 bundled skills across LaTeX, document generation, office automation, and vision analysis
+- 22 bundled skills across LaTeX, Git and repository workflow, Linux packaging, document generation, office automation, and vision analysis
 - one maintained source tree: `agents/skills/`
 - one generated Claude mirror: `claude/skills/`
 - skill-local Codex metadata via `agents/openai.yaml` inside each skill
@@ -62,6 +62,18 @@ Maintenance rule:
 | `minimax-xlsx` | Creating, editing, and validating Excel workbooks safely |
 | `pptx-generator` | Creating, editing, and analyzing PowerPoint decks |
 
+### Linux packaging
+
+| Skill | Best for |
+| --- | --- |
+| `package-rpm-for-fedora` | Building or repackaging Fedora-compatible RPMs from source, `.deb`, or binary archives |
+
+### Git and repository workflow
+
+| Skill | Best for |
+| --- | --- |
+| `github-commit` | Generating complete git commit commands with concise defaults and explicit mode switches |
+
 ### Vision
 
 | Skill | Best for |
@@ -85,7 +97,7 @@ Each skill is expected to contain:
 | Goal | Codex | Claude Code |
 | --- | --- | --- |
 | Use skills inside this repository | Work directly from `agents/skills/` | Use the generated `claude/skills/` mirror |
-| Reuse skills across other repositories | `make install` copies to `${CODEX_HOME:-$HOME/.codex}/skills` | `make install-claude` copies to `${CLAUDE_HOME:-$HOME/.claude}/skills` |
+| Reuse skills across other repositories | `make install` installs into `${CODEX_HOME:-$HOME/.codex}/skills` and fails on conflicting local changes by default | `make install-claude` installs into `${CLAUDE_HOME:-$HOME/.claude}/skills` and fails on conflicting local changes by default |
 
 ### Typical workflow
 
@@ -95,6 +107,17 @@ Each skill is expected to contain:
 4. Run `make validate` or `make validate-all`.
 5. Optionally test local installs with `make install` or `make install-claude`.
 
+Install behavior:
+
+- default `INSTALL_MODE=fail`: stop if an installed skill differs from the source skill
+- `INSTALL_MODE=keep`: keep the installed version when a conflict exists
+- `INSTALL_MODE=overwrite`: replace the installed version
+- local extra files under an installed skill are preserved when all source files already match
+
+### Skill-specific setup notes
+
+- `package-rpm-for-fedora`: install a Fedora/RHEL packaging toolchain before relying on the skill for native builds: `rpm-build`, `rpmdevtools`, `redhat-rpm-config`, `git`, `make`, `patch`, and a C compiler. For `.deb` or binary repack routes, also install `dpkg-deb` and optionally `alien` or `fpm` when those helpers are available on the host. Verify the current machine with `agents/skills/package-rpm-for-fedora/scripts/check_toolchain.sh source`, `agents/skills/package-rpm-for-fedora/scripts/check_toolchain.sh repack-deb`, or `agents/skills/package-rpm-for-fedora/scripts/check_toolchain.sh repack-binary`.
+
 ## How to invoke skills
 
 For Codex, use either explicit invocation:
@@ -103,6 +126,8 @@ For Codex, use either explicit invocation:
 Use $minimax-docx to format this Word document with the existing template.
 Use $minimax-xlsx to fix formulas in this workbook without losing formatting.
 Use $latex-bug to find the real cause of this compilation failure.
+Use $package-rpm-for-fedora to turn this upstream tar.gz or .deb into a Fedora RPM and adjust the spec for this host.
+Use $github-commit to generate the exact git add / commit / push commands for these changes, defaulting to a concise commit message.
 ```
 
 Or use natural language when the task clearly matches a skill:
@@ -126,6 +151,7 @@ make list-metadata
 make list-no-metadata
 make sync-claude
 make validate
+make validate-skill SKILL=github-commit
 make validate-quick
 make validate-all
 make install
@@ -136,6 +162,8 @@ Useful variations:
 
 ```sh
 make install-skill SKILL=minimax-pdf
+make install INSTALL_MODE=overwrite
+make install INSTALL_MODE=keep
 make install INSTALL_DIR=/tmp/codex-skills-test
 make install-claude CLAUDE_INSTALL_DIR=/tmp/claude-skills-test
 make package
@@ -151,11 +179,13 @@ make release
 - `make list-claude`: list mirrored Claude skill ids
 - `make sync-claude`: refresh `claude/skills/` from the source tree
 - `make validate`: validate required docs, source skills, mirror alignment, and inline metadata
+- `make validate-skill SKILL=<id>`: validate one source skill, its Claude mirror, and inline metadata
 - `make validate-quick`: run Codex `quick_validate.py` across metadata-backed skills
 - `make validate-all`: run both validation layers
-- `make install`: install all skills locally for Codex
-- `make install-skill SKILL=<id>`: install one Codex skill
-- `make install-claude`: install all mirrored Claude skills into the user-scoped Claude directory
+- `make install`: install all skills locally for Codex; default conflicts fail
+- `make install-skill SKILL=<id>`: install one Codex skill; default conflicts fail
+- `make install-claude`: install all mirrored Claude skills into the user-scoped Claude directory; default conflicts fail
+- `INSTALL_MODE=fail|overwrite|keep`: control install conflict handling; default is `fail`
 - `make manifest`: generate `dist/MANIFEST.txt`
 - `make package`: create `dist/cliskills-skills.tgz`
 - `make release`: run sync, validation, manifest generation, and packaging
