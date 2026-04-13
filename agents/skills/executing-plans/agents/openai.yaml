@@ -2,3 +2,5 @@ interface:
   display_name: "Execute Plans"
   short_description: "Execute a written implementation plan with review checkpoints."
   default_prompt: "使用 $executing-plans 按这份既有实现计划逐项执行，先审计划，再按步骤落地并在检查点停下来复核。"
+policy:
+  allow_implicit_invocation: true

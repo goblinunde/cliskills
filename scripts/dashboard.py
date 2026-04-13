@@ -24,6 +24,7 @@ ACTION = os.environ.get("ACTION", "").strip()
 SKILL = os.environ.get("SKILL", "").strip()
 MAKE_BIN = os.environ.get("MAKE_BIN", "make")
 LIST_FORMAT = os.environ.get("LIST_FORMAT", "table").strip() or "table"
+SUPERPOWERS_LOCK = Path(os.environ.get("SUPERPOWERS_LOCK", str(REPO_ROOT / "vendor" / "superpowers.lock")))
 VALID_MODES = ("fail", "overwrite", "keep")
 VALID_LIST_FORMATS = ("table", "ids")
 STATUS_LABELS = ("match", "match+extras", "missing", "differs")
@@ -160,6 +161,28 @@ def skill_description(skill_root: Path, skill: str, width: int) -> str:
     return truncate_text(description, width)
 
 
+def load_superpowers_skills(lock_file: Path) -> list[str]:
+    if not lock_file.is_file():
+        return []
+
+    skills: list[str] = []
+    in_block = False
+    for line in lock_file.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("SUPERPOWERS_SKILLS="):
+            in_block = True
+            continue
+        if in_block and stripped == '"':
+            break
+        if in_block and stripped:
+            skills.append(stripped)
+    return skills
+
+
+SUPERPOWERS_SKILLS = load_superpowers_skills(SUPERPOWERS_LOCK)
+SUPERPOWERS_SKILL_SET = set(SUPERPOWERS_SKILLS)
+
+
 def build_skill_rows(skill_root: Path, skills: list[str], width: int) -> list[list[str]]:
     return [[skill, skill_description(skill_root, skill, width)] for skill in skills]
 
@@ -172,8 +195,11 @@ def print_skill_table(title: str, skill_root: Path, skills: list[str], width: in
     print_table(["skill", "summary"], build_skill_rows(skill_root, skills, width))
 
 
-def build_status_rows() -> tuple[list[str], list[str], list[str], list[list[str]]]:
+def build_status_rows(skill_filter: list[str] | None = None) -> tuple[list[str], list[str], list[str], list[list[str]]]:
     repo_skills = load_skill_ids(SKILL_DIR)
+    if skill_filter is not None:
+        allowed = set(skill_filter)
+        repo_skills = [skill for skill in repo_skills if skill in allowed]
     codex_installed = load_skill_ids(INSTALL_DIR)
     claude_installed = load_skill_ids(CLAUDE_INSTALL_DIR)
     rows: list[list[str]] = []
@@ -209,14 +235,17 @@ def print_skill_list(title: str, skills: list[str]) -> None:
         print(f"  {skill}")
 
 
-def print_dashboard() -> None:
-    repo_skills, codex_installed, claude_installed, rows = build_status_rows()
+def print_dashboard(
+    skill_filter: list[str] | None = None,
+    title: str = "cliskills dashboard",
+) -> None:
+    repo_skills, codex_installed, claude_installed, rows = build_status_rows(skill_filter)
     codex_counts = Counter(row[1] for row in rows)
     claude_counts = Counter(row[2] for row in rows)
     codex_only = sorted(set(codex_installed) - set(repo_skills))
     claude_only = sorted(set(claude_installed) - set(repo_skills))
 
-    print("cliskills dashboard")
+    print(title)
     print(f"Repository root:      {REPO_ROOT}")
     print(f"Codex source dir:     {SKILL_DIR}")
     print(f"Claude mirror dir:    {CLAUDE_SKILL_DIR}")
@@ -249,9 +278,12 @@ def print_dashboard_help() -> None:
     print("Dashboard actions")
     print("  show                 show repo/install status summary")
     print("  list-repo            list bundled repository skills")
+    print("  list-superpowers     list bundled workflow/superpowers skills")
     print("  list-codex           list installed Codex skills from the current install dir")
     print("  list-claude          list installed Claude skills from the current install dir")
+    print("  show-superpowers     show dashboard status for workflow/superpowers skills only")
     print("  install-codex-skill  install or update one repo skill into Codex")
+    print("  install-codex-superpowers install or update all workflow/superpowers skills into Codex")
     print("  install-claude-skill install or update one mirrored skill into Claude")
     print("  install-codex-all    install or update all repo skills into Codex")
     print("  install-claude-all   install or update all mirrored skills into Claude")
@@ -264,14 +296,18 @@ def print_dashboard_help() -> None:
     print("  make help")
     print("  make info")
     print("  make list")
+    print("  make list-superpowers")
     print("  make list-claude")
     print("  make list LIST_FORMAT=ids")
     print("  make validate")
     print("  make validate-skill SKILL=<id>")
     print("  make install INSTALL_MODE=fail|overwrite|keep")
     print("  make install-skill SKILL=<id>")
+    print("  make install-superpowers INSTALL_MODE=fail|overwrite|keep")
+    print("  make install-superpowers-skill SKILL=<id>")
     print("  make install-claude")
     print("  make install-claude-skill SKILL=<id>")
+    print("  make skill-policy POLICY=explicit|implicit SCOPE=repo|codex|claude|all ...")
     print("  make dashboard ACTION=<action> [SKILL=<id>] [INSTALL_MODE=fail|overwrite|keep]")
 
 
@@ -284,6 +320,7 @@ def run_make(target: str, extra_vars: dict[str, str] | None = None) -> int:
         "SKILL_DIR": str(SKILL_DIR),
         "CLAUDE_SKILL_DIR": str(CLAUDE_SKILL_DIR),
         "LIST_FORMAT": LIST_FORMAT,
+        "SUPERPOWERS_LOCK": str(SUPERPOWERS_LOCK),
     }
     if extra_vars:
         forwarded.update(extra_vars)
@@ -334,6 +371,14 @@ def handle_action(action: str, skill: str, install_mode: str) -> int:
     if action == "list-repo":
         print_skill_output("Bundled repository skills:", SKILL_DIR, load_skill_ids(SKILL_DIR), LIST_FORMAT)
         return 0
+    if action == "list-superpowers":
+        print_skill_output(
+            "Bundled workflow/superpowers skills:",
+            SKILL_DIR,
+            [item for item in load_skill_ids(SKILL_DIR) if item in SUPERPOWERS_SKILL_SET],
+            LIST_FORMAT,
+        )
+        return 0
     if action == "list-claude-mirror":
         print_skill_output("Bundled Claude mirror skills:", CLAUDE_SKILL_DIR, load_skill_ids(CLAUDE_SKILL_DIR), LIST_FORMAT)
         return 0
@@ -356,6 +401,12 @@ def handle_action(action: str, skill: str, install_mode: str) -> int:
     if action == "help":
         print_dashboard_help()
         return 0
+    if action == "show-superpowers":
+        print_dashboard(
+            skill_filter=SUPERPOWERS_SKILLS,
+            title="cliskills dashboard (workflow/superpowers)",
+        )
+        return 0
     if action == "sync-claude":
         return run_make("sync-claude")
     if action == "validate-all":
@@ -367,6 +418,8 @@ def handle_action(action: str, skill: str, install_mode: str) -> int:
             "install-skill",
             {"SKILL": require_skill(skill), "INSTALL_MODE": install_mode},
         )
+    if action == "install-codex-superpowers":
+        return run_make("install-superpowers", {"INSTALL_MODE": install_mode})
     if action == "install-claude-skill":
         return run_make(
             "install-claude-skill",
@@ -412,16 +465,18 @@ def interactive_loop() -> int:
         print("Menu")
         print("  1. Refresh dashboard")
         print("  2. List bundled repository skills")
-        print("  3. List installed Codex skills")
-        print("  4. List installed Claude skills")
-        print("  5. Install or update one Codex skill")
-        print("  6. Install or update one Claude skill")
-        print("  7. Install or update all Codex skills")
-        print("  8. Install or update all Claude skills")
-        print("  9. Sync Claude mirror")
-        print(" 10. Validate one skill")
-        print(" 11. Validate all")
-        print(" 12. Help")
+        print("  3. Show workflow/superpowers only")
+        print("  4. List installed Codex skills")
+        print("  5. List installed Claude skills")
+        print("  6. Install or update one Codex skill")
+        print("  7. Install or update all workflow/superpowers skills")
+        print("  8. Install or update one Claude skill")
+        print("  9. Install or update all Codex skills")
+        print(" 10. Install or update all Claude skills")
+        print(" 11. Sync Claude mirror")
+        print(" 12. Validate one skill")
+        print(" 13. Validate all")
+        print(" 14. Help")
         print("  q. Quit")
         choice = prompt("Select: ").lower()
 
@@ -437,9 +492,16 @@ def interactive_loop() -> int:
             continue
         if choice == "3":
             print()
-            print_skill_table(f"Installed Codex skills from {INSTALL_DIR}:", INSTALL_DIR, load_skill_ids(INSTALL_DIR))
+            print_dashboard(
+                skill_filter=SUPERPOWERS_SKILLS,
+                title="cliskills dashboard (workflow/superpowers)",
+            )
             continue
         if choice == "4":
+            print()
+            print_skill_table(f"Installed Codex skills from {INSTALL_DIR}:", INSTALL_DIR, load_skill_ids(INSTALL_DIR))
+            continue
+        if choice == "5":
             print()
             print_skill_table(
                 f"Installed Claude skills from {CLAUDE_INSTALL_DIR}:",
@@ -447,41 +509,45 @@ def interactive_loop() -> int:
                 load_skill_ids(CLAUDE_INSTALL_DIR),
             )
             continue
-        if choice == "5":
+        if choice == "6":
             skill = prompt_skill()
             if skill:
                 print()
                 run_make("install-skill", {"SKILL": skill, "INSTALL_MODE": prompt_mode(INSTALL_MODE)})
             continue
-        if choice == "6":
+        if choice == "7":
+            print()
+            run_make("install-superpowers", {"INSTALL_MODE": prompt_mode(INSTALL_MODE)})
+            continue
+        if choice == "8":
             skill = prompt_skill()
             if skill:
                 print()
                 run_make("install-claude-skill", {"SKILL": skill, "INSTALL_MODE": prompt_mode(INSTALL_MODE)})
             continue
-        if choice == "7":
+        if choice == "9":
             print()
             run_make("install", {"INSTALL_MODE": prompt_mode(INSTALL_MODE)})
             continue
-        if choice == "8":
+        if choice == "10":
             print()
             run_make("install-claude", {"INSTALL_MODE": prompt_mode(INSTALL_MODE)})
             continue
-        if choice == "9":
+        if choice == "11":
             print()
             run_make("sync-claude")
             continue
-        if choice == "10":
+        if choice == "12":
             skill = prompt_skill()
             if skill:
                 print()
                 run_make("validate-skill", {"SKILL": skill})
             continue
-        if choice == "11":
+        if choice == "13":
             print()
             run_make("validate-all")
             continue
-        if choice == "12":
+        if choice == "14":
             print()
             print_dashboard_help()
             continue

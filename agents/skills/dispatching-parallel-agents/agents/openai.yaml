@@ -2,3 +2,5 @@ interface:
   display_name: "Dispatch Parallel Agents"
   short_description: "Split independent tasks across parallel agents without overlapping scope."
   default_prompt: "使用 $dispatching-parallel-agents 把这些彼此独立的任务拆开并行处理，避免共享状态和文件冲突。"
+policy:
+  allow_implicit_invocation: true

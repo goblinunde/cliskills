@@ -2,3 +2,5 @@ interface:
   display_name: "Subagent-Driven Development"
   short_description: "Execute implementation plans task by task with implementer and review loops."
   default_prompt: "使用 $subagent-driven-development 按计划逐任务推进，每个任务都经过实现、规格审查和代码质量审查后再继续。"
+policy:
+  allow_implicit_invocation: true

@@ -2,3 +2,5 @@ interface:
   display_name: "Test-Driven Development"
   short_description: "Enforce red-green-refactor before implementation."
   default_prompt: "使用 $test-driven-development 按红绿重构流程处理这个功能或修复，先写失败测试，再写最小实现。"
+policy:
+  allow_implicit_invocation: true

@@ -2,3 +2,5 @@ interface:
   display_name: "Receive Code Review"
   short_description: "Evaluate review feedback critically before applying changes."
   default_prompt: "使用 $receiving-code-review 帮我先核对这批 review 意见哪些成立、哪些需要反驳，再决定怎么改代码。"
+policy:
+  allow_implicit_invocation: true

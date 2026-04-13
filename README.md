@@ -13,6 +13,8 @@ For Chinese documentation, see [README-zh.md](./README-zh.md).
 - `Makefile` targets for sync, validation, install, interactive dashboard management, packaging, and release
 - `vendor/superpowers.lock` plus a GitHub Actions workflow for safe upstream superpowers sync via PR
 - repository-local quick validation via `scripts/quick_validate.py` with a `PyYAML` dependency
+- unified `make skill-policy` control for explicit or implicit invocation across repo and local installs
+- imported `obra/superpowers` workflow skills currently default to implicit invocation in repository metadata
 
 ## Repository model
 
@@ -74,6 +76,7 @@ Maintenance rule:
 ### Development workflow
 
 These process skills are imported from the public [`obra/superpowers`](https://github.com/obra/superpowers) project and adapted to this repository's visible `agents/skills/` layout.
+They currently default to implicit invocation in repository metadata via `policy.allow_implicit_invocation: true`, so Codex can auto-recognize them when the active runtime reads directly from this repository or from a local install that has been refreshed from it.
 
 | Skill | Best for |
 | --- | --- |
@@ -133,13 +136,15 @@ The scheduled workflow at [.github/workflows/sync-superpowers.yml](/home/yyt/Doc
 `make dashboard` combines the old `make help` and `make list` workflows into one place. It reads the bundled repo skills plus the default installed skills from `${CODEX_HOME:-$HOME/.codex}/skills` and `${CLAUDE_HOME:-$HOME/.claude}/skills`, shows match or drift status, and in a real TTY provides a numeric menu for:
 
 - browsing bundled or installed skills
+- showing only the workflow or superpowers subset
 - installing or updating one Codex skill
+- installing or updating all workflow or superpowers skills
 - installing or updating one Claude skill
 - installing or updating all bundled skills
 - syncing the Claude mirror
 - validating one skill or the whole repository
 
-For scripting, use non-interactive actions such as `make dashboard ACTION=show`, `make dashboard ACTION=install-codex-skill SKILL=github-commit`, or `make dashboard ACTION=install-claude-skill SKILL=github-commit`.
+For scripting, use non-interactive actions such as `make dashboard ACTION=show`, `make dashboard ACTION=show-superpowers`, `make dashboard ACTION=install-codex-skill SKILL=github-commit`, `make dashboard ACTION=install-codex-superpowers`, or `make dashboard ACTION=install-claude-skill SKILL=github-commit`.
 
 ### Installation modes
 
@@ -147,6 +152,44 @@ For scripting, use non-interactive actions such as `make dashboard ACTION=show`,
 | --- | --- | --- |
 | Use skills inside this repository | Work directly from `agents/skills/` | Use the generated `claude/skills/` mirror |
 | Reuse skills across other repositories | `make install` installs into `${CODEX_HOME:-$HOME/.codex}/skills` and fails on conflicting local changes by default | `make install-claude` installs into `${CLAUDE_HOME:-$HOME/.claude}/skills` and fails on conflicting local changes by default |
+
+### Invocation policy management
+
+Use `make skill-policy` to switch skills between explicit-only and implicit invocation.
+The repository currently keeps the imported workflow or superpowers skills in implicit mode so they can be auto-recognized. If you also use a local Codex install under `${CODEX_HOME:-$HOME/.codex}/skills`, update that copy separately or reinstall it after changing the repository source.
+
+Common commands:
+
+```sh
+make skill-policy POLICY=implicit GROUP=superpowers SCOPE=repo
+make install-superpowers INSTALL_MODE=overwrite
+make skill-policy POLICY=implicit GROUP=superpowers SCOPE=codex
+make skill-policy POLICY=implicit SKILL=brainstorming SCOPE=repo
+make skill-policy POLICY=explicit SKILLS="brainstorming writing-plans using-superpowers" SCOPE=codex
+make skill-policy POLICY=explicit GROUP=superpowers SCOPE=all
+```
+
+Rules:
+
+- `POLICY=explicit` writes `allow_implicit_invocation: false`
+- `POLICY=implicit` writes `allow_implicit_invocation: true`
+- `SCOPE=repo` updates `agents/skills/*/agents/openai.yaml` and then runs `make sync-claude`
+- `SCOPE=codex` updates installed Codex skill metadata under `${CODEX_HOME:-$HOME/.codex}/skills`
+- `SCOPE=claude` only updates installed Claude metadata if an `agents/openai.yaml` exists there; otherwise the skill is skipped with a notice
+- `SCOPE=all` applies the policy to the repository first, then to local Codex and Claude installs
+- choose one selector: `SKILL=<id>`, `SKILLS="a b c"`, or `GROUP=superpowers|all`
+
+Recommended patterns:
+
+- Auto-recognize imported workflow skills in the repository source tree: `make skill-policy POLICY=implicit GROUP=superpowers SCOPE=repo`
+- Install all workflow or superpowers skills into the default local Codex directory: `make install-superpowers INSTALL_MODE=overwrite`
+- Align an existing local Codex install with implicit auto-recognition: `make skill-policy POLICY=implicit GROUP=superpowers SCOPE=codex`
+- Revert the workflow skills back to explicit-only everywhere: `make skill-policy POLICY=explicit GROUP=superpowers SCOPE=all`
+
+Practical note:
+
+- Changing `SCOPE=repo` updates the maintained source tree and refreshes `claude/skills/`, but it does not rewrite an already-installed `~/.codex/skills` copy by itself.
+- If your Codex runtime reads from the installed directory rather than this repository, run either `make install-superpowers INSTALL_MODE=overwrite` or `make skill-policy POLICY=implicit GROUP=superpowers SCOPE=codex`.
 
 ### Typical workflow
 
@@ -184,7 +227,7 @@ Use $package-rpm-for-fedora to turn this upstream tar.gz or .deb into a Fedora R
 Use $github-commit to generate the exact git add / commit / push commands for these changes, defaulting to a concise commit message.
 ```
 
-Or use natural language when the task clearly matches a skill:
+Or use natural language when the task clearly matches a skill. This matters most for skills that are currently installed with `allow_implicit_invocation: true`, such as the imported workflow or superpowers set in the repository source tree:
 
 ```text
 帮我把这篇 tex 论文翻译成英文，但不要改公式、引用和命令。
@@ -192,6 +235,8 @@ Or use natural language when the task clearly matches a skill:
 帮我生成一个正式的 PDF 报告，并保持设计统一。
 
 分析这张截图里的界面问题，并给出改进建议。
+
+这个需求先别写代码，先帮我把方案拆清楚，再决定怎么实现。
 ```
 
 For Claude Code, use the mirrored skill names from `claude/skills/`.
@@ -203,6 +248,7 @@ make info
 make dashboard
 make list
 make list-ids
+make list-superpowers
 make list-metadata
 make list-no-metadata
 make list-claude
@@ -213,15 +259,21 @@ make validate-skill SKILL=github-commit
 make validate-quick
 make validate-all
 make install
+make install-superpowers
+make install-superpowers-skill SKILL=brainstorming
 make install-claude
 make install-claude-skill SKILL=github-commit
+make skill-policy POLICY=implicit GROUP=superpowers SCOPE=repo
+make skill-policy POLICY=implicit GROUP=superpowers SCOPE=codex
 ```
 
 Useful variations:
 
 ```sh
 make dashboard ACTION=show
+make dashboard ACTION=show-superpowers
 make dashboard ACTION=install-codex-skill SKILL=github-commit
+make dashboard ACTION=install-codex-superpowers
 make dashboard ACTION=install-claude-skill SKILL=github-commit
 make list LIST_FORMAT=ids
 make sync-superpowers
@@ -239,6 +291,7 @@ make release
 - `make info`: show repository paths and discovered skill counts
 - `make list`: list Codex source skills from `agents/skills/` with short descriptions
 - `make list-ids`: list Codex source skill ids only
+- `make list-superpowers`: list the allowlisted workflow or superpowers skills with short descriptions
 - `make list-metadata`: list skills that include skill-local `agents/openai.yaml`
 - `make list-no-metadata`: list skills that still lack `agents/openai.yaml`
 - `make list-claude`: list mirrored Claude skills with short descriptions
@@ -252,8 +305,11 @@ make release
 - `make validate-all`: run both validation layers
 - `make install`: install all skills locally for Codex; default conflicts fail
 - `make install-skill SKILL=<id>`: install one Codex skill; default conflicts fail
+- `make install-superpowers`: install the allowlisted workflow or superpowers skills into Codex; default conflicts fail
+- `make install-superpowers-skill SKILL=<id>`: install one allowlisted workflow or superpowers skill into Codex
 - `make install-claude`: install all mirrored Claude skills into the user-scoped Claude directory; default conflicts fail
 - `make install-claude-skill SKILL=<id>`: install one mirrored Claude skill into the user-scoped Claude directory; default conflicts fail
+- `make skill-policy ...`: switch selected skills between explicit-only and implicit invocation across repo and local installs
 - `INSTALL_MODE=fail|overwrite|keep`: control install conflict handling; default is `fail`
 - `make manifest`: generate `dist/MANIFEST.txt`
 - `make package`: create `dist/cliskills-skills.tgz`

@@ -2,3 +2,5 @@ interface:
   display_name: "Write Plans"
   short_description: "Turn approved requirements into concrete, low-context implementation plans."
   default_prompt: "使用 $writing-plans 把这份需求或设计写成可执行的实现计划，任务要细、路径要准、验证步骤要明确。"
+policy:
+  allow_implicit_invocation: true

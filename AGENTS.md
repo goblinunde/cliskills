@@ -23,12 +23,16 @@ Useful commands:
 - `make info` shows repository paths and discovered skill counts
 - `make list` lists Codex skills with short descriptions
 - `make list-ids` lists Codex skill ids only
+- `make list-superpowers` lists the allowlisted workflow or superpowers skills
 - `make list-metadata` lists skills with `agents/openai.yaml`
 - `make list-no-metadata` lists skills that do not yet include `agents/openai.yaml`
 - `make list-claude` lists mirrored Claude skills with short descriptions
 - `make dashboard` shows bundled and installed skill state and exposes install or update actions from one entry point
 - `make sync-claude` refreshes `claude/skills/` from `agents/skills/`
 - `make sync-superpowers` refreshes the allowlisted imported `obra/superpowers` skills and re-runs mirror validation
+- `make skill-policy POLICY=explicit|implicit SCOPE=repo|codex|claude|all ...` manages implicit invocation policy across source and local installs
+- `make install-superpowers` installs the allowlisted workflow or superpowers skills into the default Codex install directory
+- `make install-superpowers-skill SKILL=<id>` installs one allowlisted workflow or superpowers skill into the default Codex install directory
 - `make validate` checks required docs, metadata, and Codex/Claude mirror alignment
 - `make validate-skill SKILL=<id>` checks one skill plus its Claude mirror and metadata
 - `make validate-quick` runs Codex `quick_validate.py` across metadata-backed skills
@@ -44,6 +48,8 @@ Useful commands:
 If a skill introduces a toolchain or runtime dependency, document setup and verification in both this file and the README in the same change.
 
 For the imported `obra/superpowers` skills, treat [vendor/superpowers.lock](/home/yyt/Documents/Github/cliskills/vendor/superpowers.lock) as the allowlist and upstream SHA record. Update them through [scripts/sync_superpowers.sh](/home/yyt/Documents/Github/cliskills/scripts/sync_superpowers.sh) or the repository workflow, not by bulk-copying hidden local directories.
+The imported workflow skills currently default to implicit invocation in repository metadata so they can be auto-recognized when the runtime reads from this repository. Use `make skill-policy` rather than hand-editing many `openai.yaml` files when you want to switch them between explicit and implicit invocation in bulk.
+If your real runtime reads from `~/.codex/skills` instead of this repository checkout, pair repository changes with `make install-superpowers INSTALL_MODE=overwrite` or `make skill-policy POLICY=implicit GROUP=superpowers SCOPE=codex` so the installed copy stays aligned.
 
 The repository-local [scripts/quick_validate.py](/home/yyt/Documents/Github/cliskills/scripts/quick_validate.py) depends on `PyYAML`; keep that requirement available in local development and CI when running `make validate-quick`, `make validate-all`, or the superpowers sync workflow.
 

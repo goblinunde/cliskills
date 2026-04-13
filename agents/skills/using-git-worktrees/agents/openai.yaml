@@ -2,3 +2,5 @@ interface:
   display_name: "Use Git Worktrees"
   short_description: "Create isolated git worktrees for feature work and plan execution."
   default_prompt: "使用 $using-git-worktrees 为这次功能开发创建隔离 worktree 和分支，避免直接在当前工作区上改。"
+policy:
+  allow_implicit_invocation: true

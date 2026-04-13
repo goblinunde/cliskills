@@ -13,6 +13,8 @@
 - `Makefile` 负责同步、校验、安装、交互式 dashboard 管理、打包和发布
 - `vendor/superpowers.lock` 和 GitHub Actions workflow 负责安全同步上游 superpowers，并通过 PR 引入改动
 - 仓库内置 `scripts/quick_validate.py` 负责 quick validate，并依赖 `PyYAML`
+- 统一的 `make skill-policy` 用来管理仓库和本地安装的显式调用/隐式调用策略
+- 导入的 `obra/superpowers` 流程型 skill 当前在仓库元数据里默认允许隐式调用
 
 ## 仓库结构
 
@@ -74,6 +76,7 @@ AGENTS.md
 ### 开发流程
 
 这组流程型 skill 来自公开项目 [`obra/superpowers`](https://github.com/obra/superpowers)，并已经适配到当前仓库使用的可见 `agents/skills/` 结构。
+它们当前在仓库元数据里默认允许隐式调用，即 `policy.allow_implicit_invocation: true`；只要运行环境直接读取本仓库，或者本地安装副本已经从仓库重新同步，Codex 就可以自动识别并触发这些流程型 skill。
 
 | 技能 | 最适合处理的任务 |
 | --- | --- |
@@ -133,13 +136,15 @@ AGENTS.md
 `make dashboard` 把原来的 `make help` 和 `make list` 整合到了一个入口里。它会读取仓库内置 skill，以及默认安装目录 `${CODEX_HOME:-$HOME/.codex}/skills` 和 `${CLAUDE_HOME:-$HOME/.claude}/skills` 下的 skill，展示匹配、缺失或漂移状态；如果在真实终端里运行，还会提供数字菜单，支持：
 
 - 浏览仓库 skill 和已安装 skill
+- 只查看 workflow/superpowers 子集
 - 安装或更新单个 Codex skill
+- 一次安装或更新全部 workflow/superpowers skill
 - 安装或更新单个 Claude skill
 - 安装或更新全部内置 skill
 - 同步 Claude 镜像
 - 校验单个 skill 或整个仓库
 
-如果要脚本化调用，可以直接用非交互动作，例如 `make dashboard ACTION=show`、`make dashboard ACTION=install-codex-skill SKILL=github-commit`、`make dashboard ACTION=install-claude-skill SKILL=github-commit`。
+如果要脚本化调用，可以直接用非交互动作，例如 `make dashboard ACTION=show`、`make dashboard ACTION=show-superpowers`、`make dashboard ACTION=install-codex-skill SKILL=github-commit`、`make dashboard ACTION=install-codex-superpowers`、`make dashboard ACTION=install-claude-skill SKILL=github-commit`。
 
 ### 安装模式
 
@@ -147,6 +152,44 @@ AGENTS.md
 | --- | --- | --- |
 | 在本仓库内直接使用 | 直接读取 `agents/skills/` | 使用生成的 `claude/skills/` 镜像 |
 | 在其他仓库中复用 | `make install` 安装到 `${CODEX_HOME:-$HOME/.codex}/skills`，默认遇到本地冲突就失败 | `make install-claude` 安装到 `${CLAUDE_HOME:-$HOME/.claude}/skills`，默认遇到本地冲突就失败 |
+
+### 调用策略管理
+
+使用 `make skill-policy` 可以把 skill 切换成仅显式调用或允许隐式调用。
+当前仓库里的 imported workflow/superpowers skill 默认保持在隐式模式，方便自动识别；如果你平时运行的是 `${CODEX_HOME:-$HOME/.codex}/skills` 下的本地安装副本，还需要单独同步本地安装目录，或者重新安装。
+
+常用命令：
+
+```sh
+make skill-policy POLICY=implicit GROUP=superpowers SCOPE=repo
+make install-superpowers INSTALL_MODE=overwrite
+make skill-policy POLICY=implicit GROUP=superpowers SCOPE=codex
+make skill-policy POLICY=implicit SKILL=brainstorming SCOPE=repo
+make skill-policy POLICY=explicit SKILLS="brainstorming writing-plans using-superpowers" SCOPE=codex
+make skill-policy POLICY=explicit GROUP=superpowers SCOPE=all
+```
+
+规则：
+
+- `POLICY=explicit` 会写入 `allow_implicit_invocation: false`
+- `POLICY=implicit` 会写入 `allow_implicit_invocation: true`
+- `SCOPE=repo` 修改 `agents/skills/*/agents/openai.yaml`，然后自动执行 `make sync-claude`
+- `SCOPE=codex` 修改 `${CODEX_HOME:-$HOME/.codex}/skills` 下已安装 skill 的元数据
+- `SCOPE=claude` 只会在 Claude 本地安装目录存在 `agents/openai.yaml` 时修改；没有就跳过并提示
+- `SCOPE=all` 会先改仓库，再处理本地 Codex 和 Claude 安装
+- 选择器三选一：`SKILL=<id>`、`SKILLS="a b c"` 或 `GROUP=superpowers|all`
+
+推荐用法：
+
+- 让仓库里的 imported workflow skill 进入自动识别模式：`make skill-policy POLICY=implicit GROUP=superpowers SCOPE=repo`
+- 把全部 workflow/superpowers skill 安装到默认 Codex 本地目录：`make install-superpowers INSTALL_MODE=overwrite`
+- 让已安装的本地 Codex 副本也改成自动识别：`make skill-policy POLICY=implicit GROUP=superpowers SCOPE=codex`
+- 如果以后想恢复成仅显式调用：`make skill-policy POLICY=explicit GROUP=superpowers SCOPE=all`
+
+实际注意点：
+
+- `SCOPE=repo` 只会修改维护源并刷新 `claude/skills/`，不会自动改写已经存在的 `~/.codex/skills` 安装副本。
+- 如果你的 Codex 实际读取的是本地安装目录，而不是当前仓库，请额外执行 `make install-superpowers INSTALL_MODE=overwrite` 或 `make skill-policy POLICY=implicit GROUP=superpowers SCOPE=codex`。
 
 ### 典型维护流程
 
@@ -184,7 +227,7 @@ AGENTS.md
 使用 $github-commit 根据当前改动生成完整的 git add / commit / push 命令，默认 commit 精炼，只有我明确提到中文、丰富、README、.gitignore 或 workflow 时才扩展。
 ```
 
-也可以直接自然描述任务：
+也可以直接自然描述任务。对于当前已设置为 `allow_implicit_invocation: true` 的流程型 skill，这种自然语言方式就能触发自动识别：
 
 ```text
 把这篇 tex 论文翻译成英文，但不要改公式、引用和命令。
@@ -192,6 +235,8 @@ AGENTS.md
 帮我生成一个正式的 PDF 报告，并保持设计统一。
 
 分析这张截图里的界面问题，并给出改进建议。
+
+这个需求先别写代码，先帮我把方案拆清楚，再决定具体实现。
 ```
 
 Claude Code 使用的是 `claude/skills/` 里的镜像技能。
@@ -203,6 +248,7 @@ make info
 make dashboard
 make list
 make list-ids
+make list-superpowers
 make list-metadata
 make list-no-metadata
 make list-claude
@@ -213,15 +259,21 @@ make validate-skill SKILL=github-commit
 make validate-quick
 make validate-all
 make install
+make install-superpowers
+make install-superpowers-skill SKILL=brainstorming
 make install-claude
 make install-claude-skill SKILL=github-commit
+make skill-policy POLICY=implicit GROUP=superpowers SCOPE=repo
+make skill-policy POLICY=implicit GROUP=superpowers SCOPE=codex
 ```
 
 常用扩展命令：
 
 ```sh
 make dashboard ACTION=show
+make dashboard ACTION=show-superpowers
 make dashboard ACTION=install-codex-skill SKILL=github-commit
+make dashboard ACTION=install-codex-superpowers
 make dashboard ACTION=install-claude-skill SKILL=github-commit
 make list LIST_FORMAT=ids
 make sync-superpowers
@@ -239,6 +291,7 @@ make release
 - `make info`：显示仓库路径和技能数量
 - `make list`：列出 `agents/skills/` 下的 Codex skill，并附带简短功能说明
 - `make list-ids`：只列出 Codex skill id
+- `make list-superpowers`：列出 allowlist 中的 workflow/superpowers skill，并附带简短功能说明
 - `make list-metadata`：列出带 `agents/openai.yaml` 的 skill
 - `make list-no-metadata`：列出缺少 `agents/openai.yaml` 的 skill
 - `make list-claude`：列出 Claude 镜像 skill，并附带简短功能说明
@@ -252,8 +305,11 @@ make release
 - `make validate-all`：执行全部校验层
 - `make install`：安装全部 Codex skill；默认冲突失败
 - `make install-skill SKILL=<id>`：安装单个 Codex skill；默认冲突失败
+- `make install-superpowers`：把 allowlist 中的 workflow/superpowers skill 安装到 Codex；默认冲突失败
+- `make install-superpowers-skill SKILL=<id>`：安装单个 allowlist 中的 workflow/superpowers skill
 - `make install-claude`：安装全部 Claude 镜像 skill；默认冲突失败
 - `make install-claude-skill SKILL=<id>`：安装单个 Claude 镜像 skill；默认冲突失败
+- `make skill-policy ...`：批量或按组切换 skill 的显式调用/隐式调用策略
 - `INSTALL_MODE=fail|overwrite|keep`：控制安装冲突策略，默认是 `fail`
 - `make manifest`：生成 `dist/MANIFEST.txt`
 - `make package`：生成 `dist/cliskills-skills.tgz`

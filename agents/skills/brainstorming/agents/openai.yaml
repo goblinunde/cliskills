@@ -2,3 +2,5 @@ interface:
   display_name: "Brainstorming"
   short_description: "Refine feature ideas into an approved design before implementation."
   default_prompt: "使用 $brainstorming 先把这个功能或改动需求梳理成清晰设计，比较方案、确认取舍，再进入实现。"
+policy:
+  allow_implicit_invocation: true

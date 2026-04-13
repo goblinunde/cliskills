@@ -2,3 +2,5 @@ interface:
   display_name: "Verification Before Completion"
   short_description: "Require fresh verification evidence before claiming work is done."
   default_prompt: "使用 $verification-before-completion 在宣称修复完成、测试通过或可以提交前，先找出并运行真正能证明结果的验证命令。"
+policy:
+  allow_implicit_invocation: true

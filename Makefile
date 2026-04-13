@@ -13,6 +13,10 @@ CLAUDE_SKILL_COUNT = $(words $(CLAUDE_SKILLS))
 QUICK_VALIDATE ?= scripts/quick_validate.py
 DASHBOARD_SCRIPT ?= scripts/dashboard.py
 SUPERPOWERS_SYNC_SCRIPT ?= scripts/sync_superpowers.sh
+SKILL_POLICY_SCRIPT ?= scripts/skill_policy.py
+SUPERPOWERS_LOCK ?= vendor/superpowers.lock
+SUPERPOWERS_SKILLS = $(strip $(shell awk 'BEGIN{flag=0} /^SUPERPOWERS_SKILLS="/ {flag=1; next} flag && /^"/ {flag=0; exit} flag {print $$1}' "$(SUPERPOWERS_LOCK)" 2>/dev/null))
+SUPERPOWERS_SKILL_COUNT = $(words $(SUPERPOWERS_SKILLS))
 LIST_FORMAT ?= table
 
 INSTALL_BASE ?= $(if $(CODEX_HOME),$(CODEX_HOME),$(HOME)/.codex)
@@ -31,7 +35,7 @@ RELEASE_FILES := agents claude $(DOC_FILES)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help info list list-ids list-metadata list-no-metadata list-claude list-claude-ids sync-claude sync-superpowers doctor validate validate-skill validate-quick validate-all install install-skill install-claude install-claude-skill dashboard deploy manifest package release clean
+.PHONY: help info list list-ids list-superpowers list-metadata list-no-metadata list-claude list-claude-ids sync-claude sync-superpowers skill-policy doctor validate validate-skill validate-quick validate-all install install-skill install-superpowers install-superpowers-skill install-claude install-claude-skill dashboard deploy manifest package release clean
 
 help:
 	@printf '%s\n' \
@@ -39,6 +43,7 @@ help:
 		'  make info                         - show repository paths and skill count' \
 		'  make list                         - list bundled Codex skills with short descriptions' \
 		'  make list-ids                     - list bundled Codex skill ids only' \
+		'  make list-superpowers             - list allowlisted workflow/superpowers skills' \
 		'  make list-metadata                - list skills that include skill-local agents/openai.yaml' \
 		'  make list-no-metadata             - list skills that do not include agents/openai.yaml' \
 		'  make list-claude                  - list mirrored Claude skills with short descriptions' \
@@ -46,6 +51,7 @@ help:
 		'  make dashboard                    - interactive skill dashboard for repo/Codex/Claude installs' \
 		'  make sync-claude                  - refresh the project-scoped claude/skills mirror' \
 		'  make sync-superpowers             - sync allowlisted superpowers SKILL.md files from upstream' \
+		'  make skill-policy POLICY=explicit|implicit SCOPE=repo|codex|claude|all ... - manage implicit invocation policy' \
 		'  make doctor                       - verify required local tools exist' \
 		'  make validate                     - validate required docs, mirrored skills, and skill-local Codex metadata' \
 		'  make validate-skill SKILL=<id>    - validate one skill plus its Claude mirror and metadata' \
@@ -53,6 +59,8 @@ help:
 		'  make validate-all                 - run both repository and quick validation' \
 		'  make install                      - install all skills safely (default INSTALL_MODE=fail)' \
 		'  make install-skill SKILL=<id>     - install one skill safely (default INSTALL_MODE=fail)' \
+		'  make install-superpowers          - install allowlisted workflow/superpowers skills safely' \
+		'  make install-superpowers-skill SKILL=<id> - install one workflow/superpowers skill safely' \
 		'  make install-claude               - install mirrored Claude skills safely (default INSTALL_MODE=fail)' \
 		'  make install-claude-skill SKILL=<id> - install one mirrored Claude skill safely (default INSTALL_MODE=fail)' \
 		'  make deploy                       - alias for make install' \
@@ -70,8 +78,10 @@ info:
 	@printf 'Install mode: %s\n' "$(INSTALL_MODE)"
 	@printf 'Dist file: %s\n' "$(DIST_FILE)"
 	@printf 'Quick validator: %s\n' "$(QUICK_VALIDATE)"
+	@printf 'Superpowers lock: %s\n' "$(SUPERPOWERS_LOCK)"
 	@printf 'Codex skills discovered (%s): %s\n' "$(SKILL_COUNT)" "$(SKILLS)"
 	@printf 'Skills with Codex metadata (%s): %s\n' "$(CODEX_METADATA_SKILL_COUNT)" "$(CODEX_METADATA_SKILLS)"
+	@printf 'Superpowers skills allowlisted (%s): %s\n' "$(SUPERPOWERS_SKILL_COUNT)" "$(SUPERPOWERS_SKILLS)"
 	@printf 'Claude skills discovered (%s): %s\n' "$(CLAUDE_SKILL_COUNT)" "$(CLAUDE_SKILLS)"
 
 list:
@@ -89,6 +99,21 @@ list:
 
 list-ids:
 	@$(MAKE) list LIST_FORMAT=ids
+
+list-superpowers:
+	@test -n "$(SUPERPOWERS_SKILLS)" || { echo "No superpowers skills found in $(SUPERPOWERS_LOCK)"; exit 1; }
+	@test -f "$(DASHBOARD_SCRIPT)" || { echo "Missing dashboard script: $(DASHBOARD_SCRIPT)"; exit 1; }
+	@MAKE_BIN="$(MAKE)" \
+	REPO_ROOT="$(CURDIR)" \
+	SKILL_DIR="$(SKILL_DIR)" \
+	CLAUDE_SKILL_DIR="$(CLAUDE_SKILL_DIR)" \
+	INSTALL_DIR="$(INSTALL_DIR)" \
+	CLAUDE_INSTALL_DIR="$(CLAUDE_INSTALL_DIR)" \
+	INSTALL_MODE="$(INSTALL_MODE)" \
+	LIST_FORMAT="$(LIST_FORMAT)" \
+	SUPERPOWERS_LOCK="$(SUPERPOWERS_LOCK)" \
+	ACTION="list-superpowers" \
+	"$(PYTHON)" "$(DASHBOARD_SCRIPT)"
 
 list-metadata:
 	@if [ -z "$(CODEX_METADATA_SKILLS)" ]; then \
@@ -138,13 +163,28 @@ sync-claude:
 		dst="$(CLAUDE_SKILL_DIR)/$$skill"; \
 		rm -rf "$$dst"; \
 		mkdir -p "$$dst"; \
-		find "$$src" -mindepth 1 -maxdepth 1 ! -name agents -exec cp -R {} "$$dst"/ \; ; \
+		(cd "$$src" && tar --exclude='./agents' -cf - .) | (cd "$$dst" && tar xf -); \
 		echo "Synced $$skill -> $$dst"; \
 	done
 
 sync-superpowers:
 	@test -f "$(SUPERPOWERS_SYNC_SCRIPT)" || { echo "Missing superpowers sync script: $(SUPERPOWERS_SYNC_SCRIPT)"; exit 1; }
 	@REPO_ROOT="$(CURDIR)" "$(SUPERPOWERS_SYNC_SCRIPT)"
+
+skill-policy:
+	@test -f "$(SKILL_POLICY_SCRIPT)" || { echo "Missing skill policy script: $(SKILL_POLICY_SCRIPT)"; exit 1; }
+	@MAKE_BIN="$(MAKE)" \
+	REPO_ROOT="$(CURDIR)" \
+	SKILL_DIR="$(SKILL_DIR)" \
+	INSTALL_DIR="$(INSTALL_DIR)" \
+	CLAUDE_INSTALL_DIR="$(CLAUDE_INSTALL_DIR)" \
+	SUPERPOWERS_LOCK="$(SUPERPOWERS_LOCK)" \
+	POLICY="$(POLICY)" \
+	SCOPE="$(SCOPE)" \
+	SKILL="$(SKILL)" \
+	SKILLS="$(if $(filter command line,$(origin SKILLS)),$(SKILLS),)" \
+	GROUP="$(GROUP)" \
+	"$(PYTHON)" "$(SKILL_POLICY_SCRIPT)"
 
 install-claude: validate
 	@mkdir -p "$(CLAUDE_INSTALL_DIR)"
@@ -385,6 +425,33 @@ install-skill: validate-skill
 	fi; \
 	rm -f "$$src_manifest" "$$dst_manifest" "$$extras_manifest"
 
+install-superpowers:
+	@test -n "$(SUPERPOWERS_SKILLS)" || { echo "No superpowers skills found in $(SUPERPOWERS_LOCK)"; exit 1; }
+	@for skill in $(SUPERPOWERS_SKILLS); do \
+		$(MAKE) --no-print-directory install-skill \
+			SKILL="$$skill" \
+			INSTALL_MODE="$(INSTALL_MODE)" \
+			INSTALL_DIR="$(INSTALL_DIR)" \
+			CLAUDE_INSTALL_DIR="$(CLAUDE_INSTALL_DIR)" \
+			SKILL_DIR="$(SKILL_DIR)" \
+			CLAUDE_SKILL_DIR="$(CLAUDE_SKILL_DIR)" || exit 1; \
+	done
+	@echo "Installed or checked $(SUPERPOWERS_SKILL_COUNT) workflow/superpowers skill(s)."
+
+install-superpowers-skill:
+	@test -n "$(SKILL)" || { echo "Usage: make install-superpowers-skill SKILL=<skill-id>"; exit 1; }
+	@case " $(SUPERPOWERS_SKILLS) " in \
+		*" $(SKILL) "*) ;; \
+		*) echo "Skill $(SKILL) is not in the workflow/superpowers allowlist"; exit 1 ;; \
+	esac
+	@$(MAKE) --no-print-directory install-skill \
+		SKILL="$(SKILL)" \
+		INSTALL_MODE="$(INSTALL_MODE)" \
+		INSTALL_DIR="$(INSTALL_DIR)" \
+		CLAUDE_INSTALL_DIR="$(CLAUDE_INSTALL_DIR)" \
+		SKILL_DIR="$(SKILL_DIR)" \
+		CLAUDE_SKILL_DIR="$(CLAUDE_SKILL_DIR)"
+
 install-claude-skill: validate-skill
 	@test -n "$(SKILL)" || { echo "Usage: make install-claude-skill SKILL=<skill-id>"; exit 1; }
 	@test -d "$(CLAUDE_SKILL_DIR)/$(SKILL)" || { echo "Unknown Claude mirror skill: $(SKILL)"; exit 1; }
@@ -435,6 +502,7 @@ dashboard:
 	CLAUDE_INSTALL_DIR="$(CLAUDE_INSTALL_DIR)" \
 	INSTALL_MODE="$(INSTALL_MODE)" \
 	LIST_FORMAT="$(LIST_FORMAT)" \
+	SUPERPOWERS_LOCK="$(SUPERPOWERS_LOCK)" \
 	ACTION="$(ACTION)" \
 	SKILL="$(SKILL)" \
 	"$(PYTHON)" "$(DASHBOARD_SCRIPT)"

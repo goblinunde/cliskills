@@ -2,3 +2,5 @@ interface:
   display_name: "Use Superpowers"
   short_description: "Check for applicable process skills before doing any work."
   default_prompt: "使用 $using-superpowers 在开始任何任务前先检查适合的流程型 skill，按优先级决定接下来应该启用哪些能力。"
+policy:
+  allow_implicit_invocation: true
