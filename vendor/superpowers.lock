@@ -1,0 +1,22 @@
+# Managed by scripts/sync_superpowers.sh.
+# Only the allowlisted skills below are synchronized from upstream.
+UPSTREAM_REPO="https://github.com/obra/superpowers.git"
+UPSTREAM_REF="main"
+UPSTREAM_COMMIT=""
+SYNCED_AT=""
+SUPERPOWERS_SKILLS="
+brainstorming
+dispatching-parallel-agents
+executing-plans
+finishing-a-development-branch
+receiving-code-review
+requesting-code-review
+subagent-driven-development
+systematic-debugging
+test-driven-development
+using-git-worktrees
+using-superpowers
+verification-before-completion
+writing-plans
+writing-skills
+"

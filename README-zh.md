@@ -11,6 +11,8 @@
 - Claude 镜像目录：`claude/skills/`
 - 每个 skill 自带 `agents/openai.yaml` 作为 Codex 元数据
 - `Makefile` 负责同步、校验、安装、交互式 dashboard 管理、打包和发布
+- `vendor/superpowers.lock` 和 GitHub Actions workflow 负责安全同步上游 superpowers，并通过 PR 引入改动
+- 仓库内置 `scripts/quick_validate.py` 负责 quick validate，并依赖 `PyYAML`
 
 ## 仓库结构
 
@@ -30,6 +32,7 @@ AGENTS.md
 - 每个 skill 同时维护 `SKILL.md` 和 `agents/openai.yaml`
 - 改完后运行 `make sync-claude`
 - 发布或合并前运行 `make validate` 或 `make validate-all`
+- 对来自 `obra/superpowers` 的 allowlist skill，用 `make sync-superpowers` 或 `.github/workflows/sync-superpowers.yml` 同步，不要手动覆盖本地元数据
 
 ## 已包含技能
 
@@ -113,6 +116,18 @@ AGENTS.md
 
 `agents/skills/` 是唯一维护源。`make sync-claude` 会把每个 skill 同步到 `claude/skills/`，并自动排除 Codex 专用的 `agents/` 元数据目录。
 
+### 上游 superpowers 同步
+
+从 [`obra/superpowers`](https://github.com/obra/superpowers) 引入的开发流程 skill，会在 [vendor/superpowers.lock](/home/yyt/Documents/Github/cliskills/vendor/superpowers.lock) 里记录 allowlist、上游分支和最近一次同步的 commit。使用 [scripts/sync_superpowers.sh](/home/yyt/Documents/Github/cliskills/scripts/sync_superpowers.sh) 或 `make sync-superpowers` 时，会：
+
+- 拉取上游仓库
+- 只更新 allowlist 里的 `SKILL.md`
+- 保留本地 `agents/openai.yaml`
+- 刷新 `claude/skills/`
+- 运行 `make validate-all`
+
+[.github/workflows/sync-superpowers.yml](/home/yyt/Documents/Github/cliskills/.github/workflows/sync-superpowers.yml) 会按同样流程定时或手动运行，并把结果提交到 `bot/sync-superpowers` 分支再自动开 PR，而不是直推 `main`。
+
 ### Dashboard
 
 `make dashboard` 把原来的 `make help` 和 `make list` 整合到了一个入口里。它会读取仓库内置 skill，以及默认安装目录 `${CODEX_HOME:-$HOME/.codex}/skills` 和 `${CLAUDE_HOME:-$HOME/.claude}/skills` 下的 skill，展示匹配、缺失或漂移状态；如果在真实终端里运行，还会提供数字菜单，支持：
@@ -148,6 +163,10 @@ AGENTS.md
 - `INSTALL_MODE=keep`：冲突时保留已安装版本
 - `INSTALL_MODE=overwrite`：冲突时覆盖已安装版本
 - 如果只是已安装 skill 下多了本地额外文件，而源文件本身完全一致，会保留这些额外文件
+
+校验依赖：
+
+- `make validate-quick`、`make validate-all` 和 superpowers 同步 workflow 使用仓库内置的 [scripts/quick_validate.py](/home/yyt/Documents/Github/cliskills/scripts/quick_validate.py)，它依赖 `PyYAML`。如果本地环境没有这个包，请先执行 `python -m pip install pyyaml`。
 
 ### 技能特定环境说明
 
@@ -187,6 +206,7 @@ make list-ids
 make list-metadata
 make list-no-metadata
 make list-claude
+make sync-superpowers
 make sync-claude
 make validate
 make validate-skill SKILL=github-commit
@@ -204,6 +224,7 @@ make dashboard ACTION=show
 make dashboard ACTION=install-codex-skill SKILL=github-commit
 make dashboard ACTION=install-claude-skill SKILL=github-commit
 make list LIST_FORMAT=ids
+make sync-superpowers
 make install-skill SKILL=minimax-pdf
 make install INSTALL_MODE=overwrite
 make install INSTALL_MODE=keep
@@ -224,6 +245,7 @@ make release
 - `make list-claude-ids`：只列出 Claude 镜像 skill id
 - `make dashboard`：显示内置 skill 与已安装 skill 的状态，并提供交互式安装、更新、同步和校验入口
 - `make sync-claude`：根据源树刷新 `claude/skills/`
+- `make sync-superpowers`：同步 allowlist 中的 `obra/superpowers` skill，然后刷新镜像并运行校验
 - `make validate`：校验文档、源 skill、镜像一致性和内联元数据
 - `make validate-skill SKILL=<id>`：校验单个源 skill、对应 Claude 镜像和内联元数据
 - `make validate-quick`：对带元数据的 skill 运行 Codex `quick_validate.py`

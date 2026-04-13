@@ -28,18 +28,24 @@ Useful commands:
 - `make list-claude` lists mirrored Claude skills with short descriptions
 - `make dashboard` shows bundled and installed skill state and exposes install or update actions from one entry point
 - `make sync-claude` refreshes `claude/skills/` from `agents/skills/`
+- `make sync-superpowers` refreshes the allowlisted imported `obra/superpowers` skills and re-runs mirror validation
 - `make validate` checks required docs, metadata, and Codex/Claude mirror alignment
 - `make validate-skill SKILL=<id>` checks one skill plus its Claude mirror and metadata
 - `make validate-quick` runs Codex `quick_validate.py` across metadata-backed skills
 - `make validate-all` runs both validation layers
 - `make install INSTALL_MODE=fail|overwrite|keep` controls whether existing installed skills must match, be overwritten, or be kept
 - `make install-claude-skill SKILL=<id> INSTALL_MODE=fail|overwrite|keep` installs one mirrored Claude skill without touching the rest
+- `make doctor` now also checks the `PyYAML` dependency required by the repository-local quick validator
 - `rg --files` lists tracked files quickly
 - `git status` shows the current worktree state
 - `git diff -- README.md README-zh.md AGENTS.md Makefile` reviews project-doc changes before commit
 - `agents/skills/package-rpm-for-fedora/scripts/check_toolchain.sh source|repack-deb|repack-binary` verifies the local Fedora RPM packaging toolchain for the RPM skill
 
 If a skill introduces a toolchain or runtime dependency, document setup and verification in both this file and the README in the same change.
+
+For the imported `obra/superpowers` skills, treat [vendor/superpowers.lock](/home/yyt/Documents/Github/cliskills/vendor/superpowers.lock) as the allowlist and upstream SHA record. Update them through [scripts/sync_superpowers.sh](/home/yyt/Documents/Github/cliskills/scripts/sync_superpowers.sh) or the repository workflow, not by bulk-copying hidden local directories.
+
+The repository-local [scripts/quick_validate.py](/home/yyt/Documents/Github/cliskills/scripts/quick_validate.py) depends on `PyYAML`; keep that requirement available in local development and CI when running `make validate-quick`, `make validate-all`, or the superpowers sync workflow.
 
 For `package-rpm-for-fedora`, document and verify `rpm-build`, `rpmdevtools`, `redhat-rpm-config`, `git`, `make`, `patch`, and a compiler; for `.deb` repack flows, also note `dpkg-deb` and optional helpers such as `alien` or `fpm`.
 

@@ -11,6 +11,8 @@ For Chinese documentation, see [README-zh.md](./README-zh.md).
 - one generated Claude mirror: `claude/skills/`
 - skill-local Codex metadata via `agents/openai.yaml` inside each skill
 - `Makefile` targets for sync, validation, install, interactive dashboard management, packaging, and release
+- `vendor/superpowers.lock` plus a GitHub Actions workflow for safe upstream superpowers sync via PR
+- repository-local quick validation via `scripts/quick_validate.py` with a `PyYAML` dependency
 
 ## Repository model
 
@@ -30,6 +32,7 @@ Maintenance rule:
 - keep `SKILL.md` and `agents/openai.yaml` together inside each skill
 - run `make sync-claude` after changing the source tree
 - run `make validate` or `make validate-all` before packaging or merging
+- use `make sync-superpowers` or `.github/workflows/sync-superpowers.yml` to update the allowlisted `obra/superpowers` skills without overwriting local metadata
 
 ## Included skills
 
@@ -113,6 +116,18 @@ Each skill is expected to contain:
 
 `agents/skills/` is the only maintained source tree. `make sync-claude` copies each skill into `claude/skills/` and excludes the Codex-only `agents/` metadata directory.
 
+### Upstream superpowers sync
+
+The allowlisted development-workflow skills imported from [`obra/superpowers`](https://github.com/obra/superpowers) are tracked in [vendor/superpowers.lock](/home/yyt/Documents/Github/cliskills/vendor/superpowers.lock). Use [scripts/sync_superpowers.sh](/home/yyt/Documents/Github/cliskills/scripts/sync_superpowers.sh) or `make sync-superpowers` to:
+
+- fetch the upstream repository
+- update only allowlisted `SKILL.md` files
+- preserve local `agents/openai.yaml`
+- refresh `claude/skills/`
+- run `make validate-all`
+
+The scheduled workflow at [.github/workflows/sync-superpowers.yml](/home/yyt/Documents/Github/cliskills/.github/workflows/sync-superpowers.yml) follows the same flow and opens a PR on `bot/sync-superpowers` instead of pushing to `main`.
+
 ### Dashboard
 
 `make dashboard` combines the old `make help` and `make list` workflows into one place. It reads the bundled repo skills plus the default installed skills from `${CODEX_HOME:-$HOME/.codex}/skills` and `${CLAUDE_HOME:-$HOME/.claude}/skills`, shows match or drift status, and in a real TTY provides a numeric menu for:
@@ -148,6 +163,10 @@ Install behavior:
 - `INSTALL_MODE=keep`: keep the installed version when a conflict exists
 - `INSTALL_MODE=overwrite`: replace the installed version
 - local extra files under an installed skill are preserved when all source files already match
+
+Validation dependency:
+
+- `make validate-quick`, `make validate-all`, and the superpowers sync workflow use the repository-local [scripts/quick_validate.py](/home/yyt/Documents/Github/cliskills/scripts/quick_validate.py), which requires `PyYAML`. Install it with `python -m pip install pyyaml` if your local environment does not already provide it.
 
 ### Skill-specific setup notes
 
@@ -187,6 +206,7 @@ make list-ids
 make list-metadata
 make list-no-metadata
 make list-claude
+make sync-superpowers
 make sync-claude
 make validate
 make validate-skill SKILL=github-commit
@@ -204,6 +224,7 @@ make dashboard ACTION=show
 make dashboard ACTION=install-codex-skill SKILL=github-commit
 make dashboard ACTION=install-claude-skill SKILL=github-commit
 make list LIST_FORMAT=ids
+make sync-superpowers
 make install-skill SKILL=minimax-pdf
 make install INSTALL_MODE=overwrite
 make install INSTALL_MODE=keep
@@ -224,6 +245,7 @@ make release
 - `make list-claude-ids`: list mirrored Claude skill ids only
 - `make dashboard`: show bundled and installed skill status, then offer interactive install, update, sync, and validation actions
 - `make sync-claude`: refresh `claude/skills/` from the source tree
+- `make sync-superpowers`: sync allowlisted `obra/superpowers` skills, then refresh and validate the mirror
 - `make validate`: validate required docs, source skills, mirror alignment, and inline metadata
 - `make validate-skill SKILL=<id>`: validate one source skill, its Claude mirror, and inline metadata
 - `make validate-quick`: run Codex `quick_validate.py` across metadata-backed skills

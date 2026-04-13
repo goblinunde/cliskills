@@ -10,8 +10,9 @@ CODEX_METADATA_SKILL_COUNT = $(words $(CODEX_METADATA_SKILLS))
 CLAUDE_SKILL_DIR ?= claude/skills
 CLAUDE_SKILLS = $(sort $(notdir $(wildcard $(CLAUDE_SKILL_DIR)/*)))
 CLAUDE_SKILL_COUNT = $(words $(CLAUDE_SKILLS))
-QUICK_VALIDATE ?= /home/yyt/.codex/skills/.system/skill-creator/scripts/quick_validate.py
+QUICK_VALIDATE ?= scripts/quick_validate.py
 DASHBOARD_SCRIPT ?= scripts/dashboard.py
+SUPERPOWERS_SYNC_SCRIPT ?= scripts/sync_superpowers.sh
 LIST_FORMAT ?= table
 
 INSTALL_BASE ?= $(if $(CODEX_HOME),$(CODEX_HOME),$(HOME)/.codex)
@@ -30,7 +31,7 @@ RELEASE_FILES := agents claude $(DOC_FILES)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help info list list-ids list-metadata list-no-metadata list-claude list-claude-ids sync-claude doctor validate validate-skill validate-quick validate-all install install-skill install-claude install-claude-skill dashboard deploy manifest package release clean
+.PHONY: help info list list-ids list-metadata list-no-metadata list-claude list-claude-ids sync-claude sync-superpowers doctor validate validate-skill validate-quick validate-all install install-skill install-claude install-claude-skill dashboard deploy manifest package release clean
 
 help:
 	@printf '%s\n' \
@@ -44,6 +45,7 @@ help:
 		'  make list-claude-ids             - list mirrored Claude skill ids only' \
 		'  make dashboard                    - interactive skill dashboard for repo/Codex/Claude installs' \
 		'  make sync-claude                  - refresh the project-scoped claude/skills mirror' \
+		'  make sync-superpowers             - sync allowlisted superpowers SKILL.md files from upstream' \
 		'  make doctor                       - verify required local tools exist' \
 		'  make validate                     - validate required docs, mirrored skills, and skill-local Codex metadata' \
 		'  make validate-skill SKILL=<id>    - validate one skill plus its Claude mirror and metadata' \
@@ -140,6 +142,10 @@ sync-claude:
 		echo "Synced $$skill -> $$dst"; \
 	done
 
+sync-superpowers:
+	@test -f "$(SUPERPOWERS_SYNC_SCRIPT)" || { echo "Missing superpowers sync script: $(SUPERPOWERS_SYNC_SCRIPT)"; exit 1; }
+	@REPO_ROOT="$(CURDIR)" "$(SUPERPOWERS_SYNC_SCRIPT)"
+
 install-claude: validate
 	@mkdir -p "$(CLAUDE_INSTALL_DIR)"
 	@case "$(INSTALL_MODE)" in fail|overwrite|keep) ;; *) echo "Unknown INSTALL_MODE: $(INSTALL_MODE)"; exit 1;; esac
@@ -184,6 +190,7 @@ doctor:
 	@for tool in $(PYTHON) cmp cp diff grep tar find sort mktemp; do \
 		command -v "$$tool" >/dev/null 2>&1 || { echo "Missing required tool: $$tool"; exit 1; }; \
 	done
+	@$(PYTHON) -c 'import yaml' >/dev/null 2>&1 || { echo "Missing Python package: pyyaml"; exit 1; }
 	@if [ -f "$(QUICK_VALIDATE)" ]; then \
 		echo "Codex quick validator found."; \
 	else \
