@@ -21,16 +21,19 @@ Use the repository `Makefile` instead of ad hoc copy steps.
 Useful commands:
 
 - `make info` shows repository paths and discovered skill counts
-- `make list` lists Codex skill directories
+- `make list` lists Codex skills with short descriptions
+- `make list-ids` lists Codex skill ids only
 - `make list-metadata` lists skills with `agents/openai.yaml`
 - `make list-no-metadata` lists skills that do not yet include `agents/openai.yaml`
-- `make list-claude` lists mirrored Claude skill directories
+- `make list-claude` lists mirrored Claude skills with short descriptions
+- `make dashboard` shows bundled and installed skill state and exposes install or update actions from one entry point
 - `make sync-claude` refreshes `claude/skills/` from `agents/skills/`
 - `make validate` checks required docs, metadata, and Codex/Claude mirror alignment
 - `make validate-skill SKILL=<id>` checks one skill plus its Claude mirror and metadata
 - `make validate-quick` runs Codex `quick_validate.py` across metadata-backed skills
 - `make validate-all` runs both validation layers
 - `make install INSTALL_MODE=fail|overwrite|keep` controls whether existing installed skills must match, be overwritten, or be kept
+- `make install-claude-skill SKILL=<id> INSTALL_MODE=fail|overwrite|keep` installs one mirrored Claude skill without touching the rest
 - `rg --files` lists tracked files quickly
 - `git status` shows the current worktree state
 - `git diff -- README.md README-zh.md AGENTS.md Makefile` reviews project-doc changes before commit
@@ -64,6 +67,7 @@ When adding or changing skills, run:
 
 - `make sync-claude` if `agents/skills/` changed
 - `make validate`
+- `make dashboard ACTION=show` if you changed install or dashboard behavior and want a quick status smoke test
 - `make validate-skill SKILL=<id>` when you only need to validate one affected skill before installing it locally
 - `make validate-quick` when a metadata-backed skill changes `SKILL.md` or `agents/openai.yaml`
 

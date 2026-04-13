@@ -11,6 +11,8 @@ CLAUDE_SKILL_DIR ?= claude/skills
 CLAUDE_SKILLS = $(sort $(notdir $(wildcard $(CLAUDE_SKILL_DIR)/*)))
 CLAUDE_SKILL_COUNT = $(words $(CLAUDE_SKILLS))
 QUICK_VALIDATE ?= /home/yyt/.codex/skills/.system/skill-creator/scripts/quick_validate.py
+DASHBOARD_SCRIPT ?= scripts/dashboard.py
+LIST_FORMAT ?= table
 
 INSTALL_BASE ?= $(if $(CODEX_HOME),$(CODEX_HOME),$(HOME)/.codex)
 INSTALL_DIR ?= $(INSTALL_BASE)/skills
@@ -28,16 +30,19 @@ RELEASE_FILES := agents claude $(DOC_FILES)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help info list list-metadata list-no-metadata list-claude sync-claude doctor validate validate-skill validate-quick validate-all install install-skill install-claude deploy manifest package release clean
+.PHONY: help info list list-ids list-metadata list-no-metadata list-claude list-claude-ids sync-claude doctor validate validate-skill validate-quick validate-all install install-skill install-claude install-claude-skill dashboard deploy manifest package release clean
 
 help:
 	@printf '%s\n' \
 		'Available targets:' \
 		'  make info                         - show repository paths and skill count' \
-		'  make list                         - list bundled skill ids from the Codex source tree' \
+		'  make list                         - list bundled Codex skills with short descriptions' \
+		'  make list-ids                     - list bundled Codex skill ids only' \
 		'  make list-metadata                - list skills that include skill-local agents/openai.yaml' \
 		'  make list-no-metadata             - list skills that do not include agents/openai.yaml' \
-		'  make list-claude                  - list mirrored Claude skill ids' \
+		'  make list-claude                  - list mirrored Claude skills with short descriptions' \
+		'  make list-claude-ids             - list mirrored Claude skill ids only' \
+		'  make dashboard                    - interactive skill dashboard for repo/Codex/Claude installs' \
 		'  make sync-claude                  - refresh the project-scoped claude/skills mirror' \
 		'  make doctor                       - verify required local tools exist' \
 		'  make validate                     - validate required docs, mirrored skills, and skill-local Codex metadata' \
@@ -47,6 +52,7 @@ help:
 		'  make install                      - install all skills safely (default INSTALL_MODE=fail)' \
 		'  make install-skill SKILL=<id>     - install one skill safely (default INSTALL_MODE=fail)' \
 		'  make install-claude               - install mirrored Claude skills safely (default INSTALL_MODE=fail)' \
+		'  make install-claude-skill SKILL=<id> - install one mirrored Claude skill safely (default INSTALL_MODE=fail)' \
 		'  make deploy                       - alias for make install' \
 		'  make manifest                     - write a release manifest to dist/' \
 		'  make package                      - create a release archive in dist/' \
@@ -67,11 +73,20 @@ info:
 	@printf 'Claude skills discovered (%s): %s\n' "$(CLAUDE_SKILL_COUNT)" "$(CLAUDE_SKILLS)"
 
 list:
-	@test -d "$(SKILL_DIR)" || { echo "Missing $(SKILL_DIR)"; exit 1; }
-	@test -n "$(SKILLS)" || { echo "No skills found under $(SKILL_DIR)"; exit 1; }
-	@for skill in $(SKILLS); do \
-		printf '%s\n' "$$skill"; \
-	done
+	@test -f "$(DASHBOARD_SCRIPT)" || { echo "Missing dashboard script: $(DASHBOARD_SCRIPT)"; exit 1; }
+	@MAKE_BIN="$(MAKE)" \
+	REPO_ROOT="$(CURDIR)" \
+	SKILL_DIR="$(SKILL_DIR)" \
+	CLAUDE_SKILL_DIR="$(CLAUDE_SKILL_DIR)" \
+	INSTALL_DIR="$(INSTALL_DIR)" \
+	CLAUDE_INSTALL_DIR="$(CLAUDE_INSTALL_DIR)" \
+	INSTALL_MODE="$(INSTALL_MODE)" \
+	LIST_FORMAT="$(LIST_FORMAT)" \
+	ACTION="list-repo" \
+	"$(PYTHON)" "$(DASHBOARD_SCRIPT)"
+
+list-ids:
+	@$(MAKE) list LIST_FORMAT=ids
 
 list-metadata:
 	@if [ -z "$(CODEX_METADATA_SKILLS)" ]; then \
@@ -91,11 +106,20 @@ list-no-metadata:
 	done
 
 list-claude:
-	@test -d "$(CLAUDE_SKILL_DIR)" || { echo "Missing $(CLAUDE_SKILL_DIR)"; exit 1; }
-	@test -n "$(CLAUDE_SKILLS)" || { echo "No skills found under $(CLAUDE_SKILL_DIR)"; exit 1; }
-	@for skill in $(CLAUDE_SKILLS); do \
-		printf '%s\n' "$$skill"; \
-	done
+	@test -f "$(DASHBOARD_SCRIPT)" || { echo "Missing dashboard script: $(DASHBOARD_SCRIPT)"; exit 1; }
+	@MAKE_BIN="$(MAKE)" \
+	REPO_ROOT="$(CURDIR)" \
+	SKILL_DIR="$(SKILL_DIR)" \
+	CLAUDE_SKILL_DIR="$(CLAUDE_SKILL_DIR)" \
+	INSTALL_DIR="$(INSTALL_DIR)" \
+	CLAUDE_INSTALL_DIR="$(CLAUDE_INSTALL_DIR)" \
+	INSTALL_MODE="$(INSTALL_MODE)" \
+	LIST_FORMAT="$(LIST_FORMAT)" \
+	ACTION="list-claude-mirror" \
+	"$(PYTHON)" "$(DASHBOARD_SCRIPT)"
+
+list-claude-ids:
+	@$(MAKE) list-claude LIST_FORMAT=ids
 
 sync-claude:
 	@test -d "$(SKILL_DIR)" || { echo "Missing $(SKILL_DIR)"; exit 1; }
@@ -353,6 +377,60 @@ install-skill: validate-skill
 		fi; \
 	fi; \
 	rm -f "$$src_manifest" "$$dst_manifest" "$$extras_manifest"
+
+install-claude-skill: validate-skill
+	@test -n "$(SKILL)" || { echo "Usage: make install-claude-skill SKILL=<skill-id>"; exit 1; }
+	@test -d "$(CLAUDE_SKILL_DIR)/$(SKILL)" || { echo "Unknown Claude mirror skill: $(SKILL)"; exit 1; }
+	@mkdir -p "$(CLAUDE_INSTALL_DIR)"
+	@case "$(INSTALL_MODE)" in fail|overwrite|keep) ;; *) echo "Unknown INSTALL_MODE: $(INSTALL_MODE)"; exit 1;; esac
+	@src="$(CLAUDE_SKILL_DIR)/$(SKILL)"; \
+	dst="$(CLAUDE_INSTALL_DIR)/$(SKILL)"; \
+	src_manifest=$$(mktemp); \
+	dst_manifest=$$(mktemp); \
+	extras_manifest=$$(mktemp); \
+	if [ ! -e "$$dst" ]; then \
+		cp -R "$$src" "$(CLAUDE_INSTALL_DIR)/"; \
+		echo "Installed $(SKILL) -> $$dst"; \
+	else \
+		(cd "$$src" && find . -type f | sort > "$$src_manifest"); \
+		missing_or_changed=0; \
+		while IFS= read -r rel; do \
+			if [ ! -f "$$dst/$$rel" ] || ! cmp -s "$$src/$$rel" "$$dst/$$rel"; then \
+				missing_or_changed=1; \
+				break; \
+			fi; \
+		done < "$$src_manifest"; \
+		if [ "$$missing_or_changed" -eq 0 ]; then \
+			(cd "$$dst" && find . -type f | sort > "$$dst_manifest"); \
+			grep -Fxv -f "$$src_manifest" "$$dst_manifest" > "$$extras_manifest" || true; \
+			if [ -s "$$extras_manifest" ]; then \
+				echo "Unchanged $(SKILL) -> $$dst (local extra files preserved)"; \
+			else \
+				echo "Unchanged $(SKILL) -> $$dst"; \
+			fi; \
+		else \
+			case "$(INSTALL_MODE)" in \
+				fail) echo "Conflict for $$dst; re-run with INSTALL_MODE=overwrite or INSTALL_MODE=keep"; rm -f "$$src_manifest" "$$dst_manifest" "$$extras_manifest"; exit 1 ;; \
+				overwrite) rm -rf "$$dst"; cp -R "$$src" "$(CLAUDE_INSTALL_DIR)/"; echo "Overwritten $(SKILL) -> $$dst" ;; \
+				keep) echo "Kept existing $(SKILL) -> $$dst" ;; \
+			esac; \
+		fi; \
+	fi; \
+	rm -f "$$src_manifest" "$$dst_manifest" "$$extras_manifest"
+
+dashboard:
+	@test -f "$(DASHBOARD_SCRIPT)" || { echo "Missing dashboard script: $(DASHBOARD_SCRIPT)"; exit 1; }
+	@MAKE_BIN="$(MAKE)" \
+	REPO_ROOT="$(CURDIR)" \
+	SKILL_DIR="$(SKILL_DIR)" \
+	CLAUDE_SKILL_DIR="$(CLAUDE_SKILL_DIR)" \
+	INSTALL_DIR="$(INSTALL_DIR)" \
+	CLAUDE_INSTALL_DIR="$(CLAUDE_INSTALL_DIR)" \
+	INSTALL_MODE="$(INSTALL_MODE)" \
+	LIST_FORMAT="$(LIST_FORMAT)" \
+	ACTION="$(ACTION)" \
+	SKILL="$(SKILL)" \
+	"$(PYTHON)" "$(DASHBOARD_SCRIPT)"
 
 deploy: install
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Finish Development Branch"
+  short_description: "Close out a finished branch with verification and explicit merge or cleanup choices."
+  default_prompt: "使用 $finishing-a-development-branch 在功能完成后先跑验证，再给出合并、提 PR、保留分支或清理的明确选项。"

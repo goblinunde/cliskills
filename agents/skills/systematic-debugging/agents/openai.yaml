@@ -1,0 +1,4 @@
+interface:
+  display_name: "Systematic Debugging"
+  short_description: "Investigate root causes methodically before proposing fixes."
+  default_prompt: "使用 $systematic-debugging 先系统定位这个 bug 或失败用例的根因，确认复现和假设，再讨论修复。"

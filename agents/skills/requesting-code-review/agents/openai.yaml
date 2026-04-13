@@ -1,0 +1,4 @@
+interface:
+  display_name: "Request Code Review"
+  short_description: "Ask for focused code review before issues compound or code is merged."
+  default_prompt: "使用 $requesting-code-review 在这个阶段发起一次聚焦 review，按严重程度整理问题，避免带病继续推进。"

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Write Skills"
+  short_description: "Create or revise skills with trigger-focused descriptions and validation."
+  default_prompt: "使用 $writing-skills 帮我创建或修改一个 skill，先看没有 skill 时会怎么失败，再补最小而可靠的说明。"

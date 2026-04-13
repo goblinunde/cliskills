@@ -6,11 +6,11 @@ For Chinese documentation, see [README-zh.md](./README-zh.md).
 
 ## At a glance
 
-- 22 bundled skills across LaTeX, Git and repository workflow, Linux packaging, document generation, office automation, and vision analysis
+- 36 bundled skills across LaTeX, development workflow, Git and repository workflow, Linux packaging, document generation, office automation, and vision analysis
 - one maintained source tree: `agents/skills/`
 - one generated Claude mirror: `claude/skills/`
 - skill-local Codex metadata via `agents/openai.yaml` inside each skill
-- `Makefile` targets for sync, validation, install, packaging, and release
+- `Makefile` targets for sync, validation, install, interactive dashboard management, packaging, and release
 
 ## Repository model
 
@@ -68,6 +68,27 @@ Maintenance rule:
 | --- | --- |
 | `package-rpm-for-fedora` | Building or repackaging Fedora-compatible RPMs from source, `.deb`, or binary archives |
 
+### Development workflow
+
+These process skills are imported from the public [`obra/superpowers`](https://github.com/obra/superpowers) project and adapted to this repository's visible `agents/skills/` layout.
+
+| Skill | Best for |
+| --- | --- |
+| `using-superpowers` | Checking for relevant process skills before doing any work |
+| `brainstorming` | Turning rough feature ideas into an approved design before implementation |
+| `writing-plans` | Breaking approved requirements into detailed implementation plans |
+| `executing-plans` | Executing a written plan with review checkpoints |
+| `subagent-driven-development` | Driving plan execution task by task with implement and review loops |
+| `dispatching-parallel-agents` | Splitting independent tasks across parallel agents safely |
+| `test-driven-development` | Enforcing red-green-refactor before implementation |
+| `systematic-debugging` | Investigating root causes methodically before proposing fixes |
+| `requesting-code-review` | Requesting focused review before issues compound |
+| `receiving-code-review` | Evaluating review feedback critically before applying changes |
+| `verification-before-completion` | Requiring fresh verification before claiming success |
+| `using-git-worktrees` | Creating isolated worktrees for feature branches and plan execution |
+| `finishing-a-development-branch` | Closing out finished work with explicit merge or cleanup choices |
+| `writing-skills` | Creating or revising skills with trigger-focused descriptions and validation |
+
 ### Git and repository workflow
 
 | Skill | Best for |
@@ -92,6 +113,19 @@ Each skill is expected to contain:
 
 `agents/skills/` is the only maintained source tree. `make sync-claude` copies each skill into `claude/skills/` and excludes the Codex-only `agents/` metadata directory.
 
+### Dashboard
+
+`make dashboard` combines the old `make help` and `make list` workflows into one place. It reads the bundled repo skills plus the default installed skills from `${CODEX_HOME:-$HOME/.codex}/skills` and `${CLAUDE_HOME:-$HOME/.claude}/skills`, shows match or drift status, and in a real TTY provides a numeric menu for:
+
+- browsing bundled or installed skills
+- installing or updating one Codex skill
+- installing or updating one Claude skill
+- installing or updating all bundled skills
+- syncing the Claude mirror
+- validating one skill or the whole repository
+
+For scripting, use non-interactive actions such as `make dashboard ACTION=show`, `make dashboard ACTION=install-codex-skill SKILL=github-commit`, or `make dashboard ACTION=install-claude-skill SKILL=github-commit`.
+
 ### Installation modes
 
 | Goal | Codex | Claude Code |
@@ -106,6 +140,7 @@ Each skill is expected to contain:
 3. Run `make sync-claude`.
 4. Run `make validate` or `make validate-all`.
 5. Optionally test local installs with `make install` or `make install-claude`.
+6. Use `make dashboard` when you want one interactive entry point for repo, Codex, and Claude skill state plus install or update actions.
 
 Install behavior:
 
@@ -146,9 +181,12 @@ For Claude Code, use the mirrored skill names from `claude/skills/`.
 
 ```sh
 make info
+make dashboard
 make list
+make list-ids
 make list-metadata
 make list-no-metadata
+make list-claude
 make sync-claude
 make validate
 make validate-skill SKILL=github-commit
@@ -156,11 +194,16 @@ make validate-quick
 make validate-all
 make install
 make install-claude
+make install-claude-skill SKILL=github-commit
 ```
 
 Useful variations:
 
 ```sh
+make dashboard ACTION=show
+make dashboard ACTION=install-codex-skill SKILL=github-commit
+make dashboard ACTION=install-claude-skill SKILL=github-commit
+make list LIST_FORMAT=ids
 make install-skill SKILL=minimax-pdf
 make install INSTALL_MODE=overwrite
 make install INSTALL_MODE=keep
@@ -173,10 +216,13 @@ make release
 ## Makefile targets
 
 - `make info`: show repository paths and discovered skill counts
-- `make list`: list Codex source skill ids from `agents/skills/`
+- `make list`: list Codex source skills from `agents/skills/` with short descriptions
+- `make list-ids`: list Codex source skill ids only
 - `make list-metadata`: list skills that include skill-local `agents/openai.yaml`
 - `make list-no-metadata`: list skills that still lack `agents/openai.yaml`
-- `make list-claude`: list mirrored Claude skill ids
+- `make list-claude`: list mirrored Claude skills with short descriptions
+- `make list-claude-ids`: list mirrored Claude skill ids only
+- `make dashboard`: show bundled and installed skill status, then offer interactive install, update, sync, and validation actions
 - `make sync-claude`: refresh `claude/skills/` from the source tree
 - `make validate`: validate required docs, source skills, mirror alignment, and inline metadata
 - `make validate-skill SKILL=<id>`: validate one source skill, its Claude mirror, and inline metadata
@@ -185,6 +231,7 @@ make release
 - `make install`: install all skills locally for Codex; default conflicts fail
 - `make install-skill SKILL=<id>`: install one Codex skill; default conflicts fail
 - `make install-claude`: install all mirrored Claude skills into the user-scoped Claude directory; default conflicts fail
+- `make install-claude-skill SKILL=<id>`: install one mirrored Claude skill into the user-scoped Claude directory; default conflicts fail
 - `INSTALL_MODE=fail|overwrite|keep`: control install conflict handling; default is `fail`
 - `make manifest`: generate `dist/MANIFEST.txt`
 - `make package`: create `dist/cliskills-skills.tgz`
