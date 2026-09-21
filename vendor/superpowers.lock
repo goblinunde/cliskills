@@ -2,8 +2,8 @@
 # Only the allowlisted skills below are synchronized from upstream.
 UPSTREAM_REPO="https://github.com/obra/superpowers.git"
 UPSTREAM_REF="main"
-UPSTREAM_COMMIT=""
-SYNCED_AT=""
+UPSTREAM_COMMIT="5bf4e78011075bcfc0dc295f0724994cd123ee71"
+SYNCED_AT="2026-09-21T08:19:23Z"
 SUPERPOWERS_SKILLS="
 brainstorming
 dispatching-parallel-agents
